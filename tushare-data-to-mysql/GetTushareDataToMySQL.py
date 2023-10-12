@@ -2,19 +2,33 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-11
+# @Last Modified time: 2023-10-12
 
 import time
+import datetime
 import pandas as pd
 import tushare as ts
 from sqlalchemy import create_engine
 
-# 登录 Tushare 接口
-pro = ts.pro_api('a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981')
+# Tushare 账户 token
+token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
-# 创建指定数据库操作对象
+# 数据库用户配置
+user = 'root'
+password = '0527'
+addr = 'localhost'
+
+# 获取昨天的日期
+def getYesterday():
+   today = datetime.date.today()
+   oneday = datetime.timedelta(days=1)
+   yesterday = today - oneday
+   yesterdaystr = yesterday.strftime('%Y%m%d')
+   return yesterdaystr
+
+# 创建指定数据库操作引擎
 def creat_engine_with_database(database):
-    engine_ts = create_engine('mysql://root:0527@localhost/' + database + '?charset=utf8&use_unicode=1')
+    engine_ts = create_engine('mysql://{}:{}@/{}?charset=utf8&use_unicode=1'.format(user, password, database))
     return engine_ts
 
 # 获取指定数据库的指定表格内容
@@ -59,6 +73,12 @@ def get_cb_daily_data():
                 time.sleep(1)
             else:
                 break
+            
+# 获取指定日期内所有可转债的日行情数据
+def get_cb_md_data(start_date = '', end_date = ''):
+    engine_ts = creat_engine_with_database('bond')
+    df = pro.cb_daily(**{"start_date": start_date, "end_date": end_date})
+    write_data(engine_ts, 'cb_daily', df)
 
 # 获取期货合约基本信息
 def get_fut_basic_data():
@@ -71,7 +91,8 @@ def get_fut_basic_data():
 # 获取所有期货合约的所有历史日行情数据
 def get_fut_daily_data():
     engine_ts = creat_engine_with_database('futures')
-    sql = 'SELECT ts_code FROM fut_basic'
+    # 去除主力/连续合约
+    sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is not NULL'
     ts_code = read_data(engine_ts, 'fut_basic', sql)
     for i in range(0, len(ts_code)):
         # 若调用次数达到限制，则在一分钟内反复尝试
@@ -86,11 +107,25 @@ def get_fut_daily_data():
                 time.sleep(1)
             else:
                 break
+            
+# 获取指定日期内所有期货合约的日行情数据
+def get_fut_md_data(start_date = '', end_date = ''):
+    engine_ts = creat_engine_with_database('futures')
+    df = pro.fut_daily(**{"start_date": start_date, "end_date": end_date})
+    write_data(engine_ts, 'fut_daily', df)
+        
+# 每日将新增的各类日行情自动导入对应的表中
+def update_daily_md_data():
+    yesterday = getYesterday()
+    get_cb_md_data(yesterday, yesterday)
+    get_fut_md_data(yesterday, yesterday)
 
 if __name__ == '__main__':
+    # 登录 Tushare 接口
+    pro = ts.pro_api(token)
     
     # df = read_data('stock_basic', engine_ts)
     
-    # todo 去除主力/连续合约日行情信息
+    # update_daily_md_data()
     
     exit(1)

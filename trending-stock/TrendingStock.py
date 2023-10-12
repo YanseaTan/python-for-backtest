@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-09-28
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-10
+# @Last Modified time: 2023-10-12
 
 from EmQuantAPI import *
 import os
@@ -19,17 +19,21 @@ initFund = worksheet.range("B17").value
 feeRate = worksheet.range("D17").value
 rng = worksheet.range("G20").expand("table")
 nRows = rng.rows.count
-rng = worksheet.range("G" + str(nRows + 18)).expand("table")
+rng = worksheet.range("G" + str(nRows + 16)).expand("table")
 nColumns = rng.columns.count
-preLastFund = worksheet.range("D" + str(nRows + 18)).value
-remainFund = worksheet.range("E" + str(nRows + 18)).value
-prePosition = {}
+preLastFund = worksheet.range("D" + str(nRows + 16)).value
+remainFund = worksheet.range("E" + str(nRows + 16)).value
 preCodeSet = set()
-if nRows > 2:
+preCodeName = {}
+preClosePrice = {}
+prePosition = {}
+if nRows > 4:
     for i in range(0, nColumns):
-        if rng.columns[0 + i][1].value > 0:
+        if rng.columns[0 + i][3].value > 0:
             preCodeSet.add(rng.columns[0 + i][0].value)
-            prePosition[rng.columns[0 + i][0].value] = rng.columns[0 + i][1].value
+            preCodeName[rng.columns[0 + i][0].value] = rng.columns[0 + i][1].value
+            preClosePrice[rng.columns[0 + i][0].value] = rng.columns[0 + i][2].value
+            prePosition[rng.columns[0 + i][0].value] = rng.columns[0 + i][3].value
 workbook.close()
 app.quit()
 
@@ -42,9 +46,12 @@ worksheet = workbook.sheets.active
 rng = worksheet.range("A2").expand("table")
 nRows = rng.rows.count
 codeSet = set()
+codeName = {}
 for i in range(2, nRows + 2):
-    addr = "A" + str(i)
-    codeSet.add(str(worksheet.range(addr).value))
+    codeAddr = "A" + str(i)
+    codeSet.add(str(worksheet.range(codeAddr).value))
+    nameAddr = "B" + str(i)
+    codeName[str(worksheet.range(codeAddr).value)] = str(worksheet.range(nameAddr).value)
 workbook.close()
 app.quit()
 
@@ -106,12 +113,19 @@ for code, price in closePrice.items():
             remainFund -= (position[code] - prePosition[code]) * price * (1 + feeRate)
         else :
             remainFund -= position[code] * price * (1 + feeRate)
+
+# 将合约的相关信息进行排序，方便后续在 excel 中进行插入
 for code in deleteCode:
+    codeName[code] = preCodeName[code]
     position[code] = 0
-codeKey = sorted(position.keys())
-sortedPosition = {}
-for code in codeKey:
-    sortedPosition[code] = position[code]
+sortedCode = sorted(position.keys())
+sortedCodeName = []
+sortedClosePrice = []
+sortedPosition = []
+for code in sortedCode:
+    sortedCodeName.append(codeName[code])
+    sortedClosePrice.append(closePrice[code])
+    sortedPosition.append(position[code])
             
 # 计算最新总资金、涨幅以及累计收益率
 lastFund = remainFund
@@ -133,40 +147,56 @@ worksheet.range("A" + str(nRows + 20)).value = yesterdayDate
 worksheet.range("B" + str(nRows + 20)).value = rise
 worksheet.range("C" + str(nRows + 20)).value = totalRise
 worksheet.range("D" + str(nRows + 20)).value = lastFund
+worksheet.range("D" + str(nRows + 20)).api.NumberFormat = "0.00"
 worksheet.range("E" + str(nRows + 20)).value = remainFund
+worksheet.range("E" + str(nRows + 20)).api.NumberFormat = "0.00"
 worksheet.range("F" + str(nRows + 20)).value = len(codeSet)
-worksheet.range("A" + str(nRows + 20) + ":A" + str(nRows + 21)).api.Merge()
-worksheet.range("A" + str(nRows + 20) + ":A" + str(nRows + 21)).api.VerticalAlignment = -4108
-if rise > 0:
-    worksheet.range("B" + str(nRows + 20)).color = worksheet.range("G17").color
-elif rise < 0:
-    worksheet.range("B" + str(nRows + 20)).color = worksheet.range("H17").color
-worksheet.range("B" + str(nRows + 20) + ":B" + str(nRows + 21)).api.Merge()
-worksheet.range("B" + str(nRows + 20) + ":B" + str(nRows + 21)).api.VerticalAlignment = -4108
-worksheet.range("C" + str(nRows + 20) + ":C" + str(nRows + 21)).api.Merge()
-worksheet.range("C" + str(nRows + 20) + ":C" + str(nRows + 21)).api.VerticalAlignment = -4108
-worksheet.range("D" + str(nRows + 20) + ":D" + str(nRows + 21)).api.Merge()
-worksheet.range("D" + str(nRows + 20) + ":D" + str(nRows + 21)).api.VerticalAlignment = -4108
-worksheet.range("E" + str(nRows + 20) + ":E" + str(nRows + 21)).api.Merge()
-worksheet.range("E" + str(nRows + 20) + ":E" + str(nRows + 21)).api.VerticalAlignment = -4108
-worksheet.range("F" + str(nRows + 20) + ":F" + str(nRows + 21)).api.Merge()
-worksheet.range("F" + str(nRows + 20) + ":F" + str(nRows + 21)).api.VerticalAlignment = -4108
-worksheet.range("G" + str(nRows + 20)).value = list(sortedPosition.keys())
-worksheet.range("G" + str(nRows + 21)).value = list(sortedPosition.values())
 
+worksheet.range("A" + str(nRows + 20) + ":A" + str(nRows + 23)).api.Merge()
+worksheet.range("A" + str(nRows + 20) + ":A" + str(nRows + 23)).api.VerticalAlignment = -4108
+if rise > 0:
+    worksheet.range("B" + str(nRows + 20)).color = worksheet.range("H17").color
+elif rise < 0:
+    worksheet.range("B" + str(nRows + 20)).color = worksheet.range("G17").color
+worksheet.range("B" + str(nRows + 20) + ":B" + str(nRows + 23)).api.Merge()
+worksheet.range("B" + str(nRows + 20) + ":B" + str(nRows + 23)).api.VerticalAlignment = -4108
+worksheet.range("C" + str(nRows + 20) + ":C" + str(nRows + 23)).api.Merge()
+worksheet.range("C" + str(nRows + 20) + ":C" + str(nRows + 23)).api.VerticalAlignment = -4108
+worksheet.range("D" + str(nRows + 20) + ":D" + str(nRows + 23)).api.Merge()
+worksheet.range("D" + str(nRows + 20) + ":D" + str(nRows + 23)).api.VerticalAlignment = -4108
+worksheet.range("E" + str(nRows + 20) + ":E" + str(nRows + 23)).api.Merge()
+worksheet.range("E" + str(nRows + 20) + ":E" + str(nRows + 23)).api.VerticalAlignment = -4108
+worksheet.range("F" + str(nRows + 20) + ":F" + str(nRows + 23)).api.Merge()
+worksheet.range("F" + str(nRows + 20) + ":F" + str(nRows + 23)).api.VerticalAlignment = -4108
+
+worksheet.range("G" + str(nRows + 20)).value = list(sortedCode)
+worksheet.range("G" + str(nRows + 21)).value = sortedCodeName
+worksheet.range("G" + str(nRows + 22)).value = sortedClosePrice
+worksheet.range("G" + str(nRows + 23)).value = sortedPosition
+
+# 格式化单元格样式
 rng = worksheet.range("G" + str(nRows + 20)).expand("table")
 nColumns = rng.columns.count
 for i in range(0, nColumns):
     code = rng.columns[0 + i][0].value
-    pos = rng.columns[0 + i][1].value
+    closePrice = rng.columns[0 + i][2].value
+    rng.columns[0 + i][2].api.NumberFormat = "0.00"
+    
     if code in addCode:
+        rng.columns[0 + i][0].color = worksheet.range("E17").color
         rng.columns[0 + i][1].color = worksheet.range("E17").color
     elif code in deleteCode:
+        rng.columns[0 + i][0].color = worksheet.range("F17").color
         rng.columns[0 + i][1].color = worksheet.range("F17").color
-    elif pos > prePosition[code]:
-        rng.columns[0 + i][1].color = worksheet.range("G17").color
-    elif pos < prePosition[code]:
-        rng.columns[0 + i][1].color = worksheet.range("H17").color
+    
+    if code in preCodeSet:
+        if closePrice > preClosePrice[code]:
+            rng.columns[0 + i][2].color = worksheet.range("H17").color
+        elif closePrice < preClosePrice[code]:
+            rng.columns[0 + i][2].color = worksheet.range("G17").color
+
 workbook.save()
 workbook.close()
 app.quit()
+
+print('脚本运行结束，收益率计算完成！')
