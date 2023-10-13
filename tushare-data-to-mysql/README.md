@@ -1,6 +1,11 @@
 # tushare-data-to-mysql
 
-将 Tushare 数据平台的数据导入到 MySQL 数据库中的自动化脚本
+### 包含模块
+
+- **TushareDataToMySQL**
+  - 将 Tushare 数据平台的数据导入到 MySQL 数据库中的自动化脚本
+- **FuturesMDToSpread**
+  - 通过数据库中的期货合约日行情数据，计算所有期货合约日行情价差并存入数据库的自动化脚本
 
 ### 环境依赖
 
