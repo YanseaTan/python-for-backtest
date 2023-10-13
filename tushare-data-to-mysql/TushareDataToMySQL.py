@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-12
+# @Last Modified time: 2023-10-13
 
 import time
 import datetime
@@ -74,10 +74,10 @@ def get_cb_daily_data():
             else:
                 break
             
-# 获取指定日期内所有可转债的日行情数据
-def get_cb_md_data(start_date = '', end_date = ''):
+# 获取指定交易日所有可转债的日行情数据
+def get_cb_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('bond')
-    df = pro.cb_daily(**{"start_date": start_date, "end_date": end_date})
+    df = pro.cb_daily(**{"trade_date": trade_date})
     write_data(engine_ts, 'cb_daily', df)
 
 # 获取期货合约基本信息
@@ -108,17 +108,17 @@ def get_fut_daily_data():
             else:
                 break
             
-# 获取指定日期内所有期货合约的日行情数据
-def get_fut_md_data(start_date = '', end_date = ''):
+# 获取指定交易日所有期货合约的日行情数据
+def get_fut_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('futures')
-    df = pro.fut_daily(**{"start_date": start_date, "end_date": end_date})
+    df = pro.fut_daily(**{"trade_date": trade_date})
     write_data(engine_ts, 'fut_daily', df)
         
-# 每日将新增的各类日行情自动导入对应的表中
+# 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_md_data():
     yesterday = getYesterday()
-    get_cb_md_data(yesterday, yesterday)
-    get_fut_md_data(yesterday, yesterday)
+    get_cb_md_data(yesterday)
+    get_fut_md_data(yesterday)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口
