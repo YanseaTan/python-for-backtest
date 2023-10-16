@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-09-28
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-12
+# @Last Modified time: 2023-10-16
 
 from EmQuantAPI import *
 import os
@@ -71,18 +71,20 @@ if loginResult.ErrorCode != 0:
     print(loginResult.ErrorMsg)
     exit(1)
     
-# 获取昨天的日期
-def getYesterday():
+# 获取上一交易日日期
+def getLastTradeDate():
    today = datetime.date.today()
    oneday = datetime.timedelta(days=1)
-   yesterday = today - oneday
-   yesterdaystr = yesterday.strftime('%Y-%m-%d')
-   return yesterdaystr
-
-yesterdayDate = getYesterday()
+   threeWeekAgo = today - oneday * 21
+   todayStr = today.strftime('%Y-%m-%d')
+   threeWeekAgoStr = threeWeekAgo.strftime('%Y-%m-%d')
+   tradeDate = c.tradedates(threeWeekAgoStr,todayStr,"period=1,order=1,market=CNSESH")
+   strDate = tradeDate.Data[-2].replace('/', '-')
+   return strDate
 
 # 获取所有可转债（包含准备被剔除的）的昨日收盘价
-choiceData=c.csd(strAllCode,"CLOSE",yesterdayDate,yesterdayDate,"type=1,period=1,adjustflag=1,curtype=1,order=1,market=CNSESH")
+lastTradeDate = getLastTradeDate()
+choiceData = c.csd(strAllCode,"CLOSE",lastTradeDate,lastTradeDate,"type=1,period=1,adjustflag=1,curtype=1,order=1,market=CNSESH")
 
 closePrice = {}
 if(choiceData.ErrorCode != 0):
@@ -143,7 +145,7 @@ workbook = app.books.open('./收益率.xlsx')
 worksheet = workbook.sheets.active
 rng = worksheet.range("G20").expand("table")
 nRows = rng.rows.count
-worksheet.range("A" + str(nRows + 20)).value = yesterdayDate
+worksheet.range("A" + str(nRows + 20)).value = lastTradeDate
 worksheet.range("B" + str(nRows + 20)).value = rise
 worksheet.range("C" + str(nRows + 20)).value = totalRise
 worksheet.range("D" + str(nRows + 20)).value = lastFund
