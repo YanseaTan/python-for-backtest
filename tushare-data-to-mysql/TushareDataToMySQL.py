@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-13
+# @Last Modified time: 2023-10-16
 
 import time
 import datetime
@@ -111,7 +111,16 @@ def get_fut_daily_data():
 # 获取指定交易日所有期货合约的日行情数据
 def get_fut_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('futures')
+    # 去除主力/连续合约
+    sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is NULL'
+    ts_code = read_data(engine_ts, 'fut_basic', sql)
+    code_list = ts_code['ts_code'].tolist()
     df = pro.fut_daily(**{"trade_date": trade_date})
+    del_index = []
+    for i in range(0, len(df)):
+        if str(df.iloc[i].iat[0]) in code_list:
+            del_index.append(i)
+    df = df.drop(df.index[del_index])
     write_data(engine_ts, 'fut_daily', df)
         
 # 每日将新增的各类昨日行情自动导入对应的表中
@@ -124,8 +133,6 @@ if __name__ == '__main__':
     # 登录 Tushare 接口
     pro = ts.pro_api(token)
     
-    # df = read_data('stock_basic', engine_ts)
-    
-    # update_daily_md_data()
+    update_daily_md_data()
     
     exit(1)
