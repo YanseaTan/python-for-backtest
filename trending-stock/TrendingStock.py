@@ -2,10 +2,9 @@
 # @Author: Yansea
 # @Date:   2023-09-28
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-16
+# @Last Modified time: 2023-10-17
 
 from EmQuantAPI import *
-import os
 import xlwings as xw
 import datetime
     

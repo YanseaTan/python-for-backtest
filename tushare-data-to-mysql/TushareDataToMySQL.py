@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-16
+# @Last Modified time: 2023-10-17
 
 import time
 import datetime
@@ -134,5 +134,3 @@ if __name__ == '__main__':
     pro = ts.pro_api(token)
     
     update_daily_md_data()
-    
-    exit(1)
