@@ -2,21 +2,17 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-17
+# @Last Modified time: 2023-10-18
 
 import time
 import datetime
 import pandas as pd
 import tushare as ts
 from sqlalchemy import create_engine
+from DatabaseTools import *
 
 # Tushare 账户 token
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
-
-# 数据库用户配置
-user = 'root'
-password = '0527'
-addr = 'localhost'
 
 # 获取昨天的日期
 def getYesterday():
@@ -25,21 +21,6 @@ def getYesterday():
    yesterday = today - oneday
    yesterdaystr = yesterday.strftime('%Y%m%d')
    return yesterdaystr
-
-# 创建指定数据库操作引擎
-def creat_engine_with_database(database):
-    engine_ts = create_engine('mysql://{}:{}@/{}?charset=utf8&use_unicode=1'.format(user, password, database))
-    return engine_ts
-
-# 获取指定数据库的指定表格内容
-def read_data(engine_ts, tableName, sql):
-    df = pd.read_sql_query(sql, engine_ts)
-    return df
-
-# 将指定内容写入指定数据库的指定表格中
-def write_data(engine_ts, tableName, df):
-    res = df.to_sql(tableName, engine_ts, index=False, if_exists='append', chunksize=5000)
-    print('写入成功！数据量:', res)
 
 # 获取股票基本信息
 def get_stock_basic_data():

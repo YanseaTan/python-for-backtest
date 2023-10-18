@@ -6,6 +6,12 @@
   - 将 Tushare 数据平台的数据导入到 MySQL 数据库中的自动化脚本
 - **FuturesMDToSpread**
   - 通过数据库中的期货合约日行情数据，计算所有期货合约日行情价差并存入数据库的自动化脚本
+- **WriteSpreadDataToXlsx**
+  - 统计分析数据库中的期货价差日行情数据，将例如组合合约最低价差数据导出到 Excel 表格文件中，方便其他人查看
+- **UpdateSpreadConfig**
+  - 通过数据库中的期货价差日行情数据，统计分析得到所有品种下所有跨月组合 10% 最低价差，并以此更新行情服务器所需的价差配置文件
+- **DatabaseTools**
+  - 包含与数据库交互的工具函数
 
 ### 环境依赖
 
@@ -16,6 +22,7 @@
   - pandas
   - sqlalchemy
   - mysqlclient
+  - xlwings
 
 ### 使用方法
 

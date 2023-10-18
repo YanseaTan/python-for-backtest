@@ -1,105 +1,13 @@
 # -*- coding: utf-8 -*-
 # @Author: Yansea
-# @Date:   2023-10-13
+# @Date:   2023-10-18
 # @Last Modified by:   Yansea
 # @Last Modified time: 2023-10-18
 
-import pandas as pd
 from sqlalchemy import create_engine
-import matplotlib.pyplot as plt
 import xlwings as xw
 import datetime
 from DatabaseTools import *
-    
-# 获取指定两个合约在所有重合交易日的价差数据，并存入数据库
-def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
-    engine_ts = creat_engine_with_database('futures')
-    sql = "select trade_date from fut_daily where ts_code = '{}' and close is not NULL;".format(ins_1)
-    date_1 = read_data(engine_ts, 'fut_daily', sql)
-    sql = "select trade_date from fut_daily where ts_code = '{}' and close is not NULL;".format(ins_2)
-    date_2 = read_data(engine_ts, 'fut_daily', sql)
-    date = pd.merge(date_1, date_2)
-    sql = "select trade_date, close from fut_daily where ts_code = '{}';".format(ins_1)
-    close_1 = read_data(engine_ts, 'fut_daily', sql)
-    sql = "select trade_date, close from fut_daily where ts_code = '{}';".format(ins_2)
-    close_2 = read_data(engine_ts, 'fut_daily', sql)
-    
-    ts_code = ins_1[:ins_1.index('.')] + '-' + ins_2[:ins_2.index('.')]
-    spread_type = ins_1[:ins_1.index('.')][-2:] + '-' + ins_2[:ins_2.index('.')][-2:]
-    # 当数据表不为空，需要新增数据时使用，适用于有可能插入重复数据的情况（更慢）
-    ts_code_list = [ts_code]
-    fut_code_list = [fut_code]
-    spread_type_list = [spread_type]
-    trade_date_list = []
-    close_list = []
-    df = pd.DataFrame()
-    
-    for i in range(0, len(date)):
-        trade_date = date.loc[i]['trade_date']
-        spread = close_1[close_1['trade_date'] == trade_date].iat[0, 1] - close_2[close_2['trade_date'] == trade_date].iat[0, 1]
-        trade_date_list.append(trade_date)
-        close_list.append(spread)
-        df['ts_code'] = ts_code_list
-        df['fut_code'] = fut_code_list
-        df['spread_type'] = spread_type_list
-        df['trade_date'] = trade_date_list
-        df['close'] = close_list
-        trade_date_list.clear()
-        close_list.clear()
-        # 写入数据库，避免 Key 重复后报错
-        try:
-            write_data(engine_ts, 'fut_spread_daily', df)
-        except:
-            continue
-    
-    # 当数据表为空时运行，或者保证插入数据不存在重复数据时运行（更快）
-    # ts_code_list = [ts_code] * len(date)
-    # fut_code_list = [fut_code] * len(date)
-    # spread_type_list = [spread_type] * len(date)
-    # trade_date_list = []
-    # close_list = []
-    # df = pd.DataFrame()
-    
-    # for i in range(0, len(date)):
-    #     trade_date = date.loc[i]['trade_date']
-    #     spread = close_1[close_1['trade_date'] == trade_date].iat[0, 1] - close_2[close_2['trade_date'] == trade_date].iat[0, 1]
-    #     trade_date_list.append(trade_date)
-    #     close_list.append(spread)
-        
-    # df['ts_code'] = ts_code_list
-    # df['fut_code'] = fut_code_list
-    # df['spread_type'] = spread_type_list
-    # df['trade_date'] = trade_date_list
-    # df['close'] = close_list
-    
-    # write_data(engine_ts, 'fut_spread_daily', df)
-        
-    print('写入完毕！数据量：{} 合约组合：{} '.format(len(date), ts_code))
-    
-    # 绘制图像
-    # figure,axes=plt.subplots(nrows=1,ncols=2,figsize=(20,5))
-    # df.plot(ax=axes[0])         # 折线图
-    # df.plot.kde(ax=axes[1])     # 概率分布图
-    # plt.show()                  # 保持图像显示
-
-# 获取指定品种在指定到期日区间内所有的相邻月组合列表，并将所有合约对在重合交易日的价差数据存入数据库
-def store_spread_daily_by_fut_code(fut_code, start_date, end_date):
-    engine_ts = creat_engine_with_database('futures')
-    sql = "select ts_code from fut_basic where fut_code = '{}' and delist_date > '{}' and delist_date < '{}' order by ts_code;".format(fut_code, start_date, end_date)
-    code_df = read_data(engine_ts, 'fut_basic', sql)
-    combination_list = []
-    for i in range(0, len(code_df) - 1):
-        ins_1 = code_df.loc[i]['ts_code']
-        ins_2 = code_df.loc[i + 1]['ts_code']
-        combination = []
-        combination.append(ins_1)
-        combination.append(ins_2)
-        combination_list.append(combination)
-    
-    for i in range(0, len(combination_list)):
-        ins_1 = combination_list[i][0]
-        ins_2 = combination_list[i][1]
-        store_spread_daily_by_ts_code(fut_code, ins_1, ins_2)
 
 # 根据合约组合名称返回该组合的所有日行情信息
 def get_spread_daily_by_ts_code(ts_code):
@@ -109,7 +17,7 @@ def get_spread_daily_by_ts_code(ts_code):
     return df
 
 # 将所有组合合约价差数据导出到 excel 中
-def write_spread_data_to_xlsx():
+def write_spread_low_to_xlsx():
     engine_ts = creat_engine_with_database('futures')
     sql = "select distinct ts_code from fut_spread_daily order by ts_code;"
     code_df = read_data(engine_ts, 'fut_spread_daily', sql)
@@ -200,7 +108,7 @@ def write_spread_data_to_xlsx():
                      df.loc[max(round(num * 0.15), 1) - 1]['close'], df.loc[max(round(num * 0.2), 1) - 1]['close'], df.loc[0]['close'], df.loc[num - 1]['close']]
         ws.range('A' + str(nRows + 1)).value = data_list
         ws.autofit()
-        print('写入详细价差数据，进度：{}%'.format(format(i / len(fut_df) * 100, '.2f')))
+        print('写入详细价差数据，进度：{}%'.format(format(i / cnt * 100, '.2f')))
     
     # 按品种插入所有合约组合详细数据的连续最低价差数据
     for i in range(0, len(fut_df)):
@@ -235,17 +143,8 @@ def write_spread_data_to_xlsx():
     app.quit()
     print('Excel 数据导出完毕！')
 
-
 def main():
-    # 导入所选时间内所有合约组合的日行情价差数据到数据库中
-    # engine_ts = creat_engine_with_database('futures')
-    # sql = "select distinct fut_code from fut_basic order by fut_code;"
-    # fut_df = read_data(engine_ts, 'fut_spread_daily', sql)
-    # fut_list = fut_df['fut_code'].tolist()
-    # for i in range(0, len(fut_list)):
-    #     store_spread_daily_by_fut_code(fut_list[i], '20200717', '20231017')
-
-    write_spread_data_to_xlsx()
+    write_spread_low_to_xlsx()
 
 
 if __name__ == "__main__":
