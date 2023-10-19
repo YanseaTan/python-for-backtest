@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-18
+# @Last Modified time: 2023-10-19
 
 import time
 import datetime
@@ -60,6 +60,7 @@ def get_cb_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('bond')
     df = pro.cb_daily(**{"trade_date": trade_date})
     write_data(engine_ts, 'cb_daily', df)
+    print('新增可转债日行情 {} 条！'.format(len(df)))
 
 # 获取期货合约基本信息
 def get_fut_basic_data():
@@ -103,6 +104,7 @@ def get_fut_md_data(trade_date = ''):
             del_index.append(i)
     df = df.drop(df.index[del_index])
     write_data(engine_ts, 'fut_daily', df)
+    print('新增期货日行情 {} 条！'.format(len(df)))
         
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_md_data():
