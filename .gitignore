@@ -159,10 +159,11 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# choice api
+# self
 libs/
 EmQuantAPI.py
 installEmQuantAPI.py
 trending-stock/可转债.xlsx
 trending-stock/收益率.xlsx
 productOps.json
+*.xlsx

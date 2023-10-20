@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-18
+# @Last Modified time: 2023-10-20
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -19,12 +19,12 @@ def update_spread_config():
     for i in range(0, len(ops_json)):
         fut_code = ops_json[i]['ProductID']
         sql = "select distinct spread_type from fut_spread_daily where fut_code = '{}' order by spread_type".format(fut_code)
-        spread_type_df = read_data(engine_ts, 'fut_spread_daily', sql)
+        spread_type_df = read_data(engine_ts, sql)
         spread_dict = {}
         for j in range(0, len(spread_type_df)):
             spread_type = spread_type_df.loc[j]['spread_type']
             sql = "select close from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by close".format(fut_code, spread_type)
-            close_df = read_data(engine_ts, 'fut_spread_daily', sql)
+            close_df = read_data(engine_ts, sql)
             num = len(close_df)
             spread_dict[spread_type] = close_df.loc[max(round(num * 0.1), 1) - 1]['close']
         ops_json[i]["RecommendSpread"] = spread_dict

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-19
+# @Last Modified time: 2023-10-20
 
 import time
 import datetime
@@ -40,7 +40,7 @@ def get_cb_basic_data():
 def get_cb_daily_data():
     engine_ts = creat_engine_with_database('bond')
     sql = 'SELECT ts_code FROM cb_basic'
-    ts_code = read_data(engine_ts, 'cb_basic', sql)
+    ts_code = read_data(engine_ts, sql)
     for i in range(0, len(ts_code)):
         # 若调用次数达到限制，则在一分钟内反复尝试
         for _ in range(60):
@@ -75,7 +75,7 @@ def get_fut_daily_data():
     engine_ts = creat_engine_with_database('futures')
     # 去除主力/连续合约
     sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is not NULL'
-    ts_code = read_data(engine_ts, 'fut_basic', sql)
+    ts_code = read_data(engine_ts, sql)
     for i in range(0, len(ts_code)):
         # 若调用次数达到限制，则在一分钟内反复尝试
         for _ in range(60):
@@ -95,7 +95,7 @@ def get_fut_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('futures')
     # 去除主力/连续合约
     sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is NULL'
-    ts_code = read_data(engine_ts, 'fut_basic', sql)
+    ts_code = read_data(engine_ts, sql)
     code_list = ts_code['ts_code'].tolist()
     df = pro.fut_daily(**{"trade_date": trade_date})
     del_index = []

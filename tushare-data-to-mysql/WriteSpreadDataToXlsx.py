@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-19
+# @Last Modified time: 2023-10-20
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -13,16 +13,16 @@ from DatabaseTools import *
 def get_spread_daily_by_ts_code(ts_code, index):
     engine_ts = creat_engine_with_database('futures')
     sql = "select * from fut_spread_daily where ts_code = '{}' order by {};".format(ts_code, index)
-    df = read_data(engine_ts, 'fut_spread_daily', sql)
+    df = read_data(engine_ts, sql)
     return df
 
 # 将所有组合合约最低价差数据导出到 excel 中
 def write_spread_low_to_xlsx():
     engine_ts = creat_engine_with_database('futures')
     sql = "select distinct ts_code from fut_spread_daily order by ts_code;"
-    code_df = read_data(engine_ts, 'fut_spread_daily', sql)
+    code_df = read_data(engine_ts, sql)
     sql = "select distinct fut_code from fut_spread_daily order by fut_code desc;"
-    fut_df = read_data(engine_ts, 'fut_spread_daily', sql)
+    fut_df = read_data(engine_ts, sql)
     
     # 以品种名在表格中创建不同的 sheet
     app = xw.App(visible=True,add_book=False)
@@ -32,7 +32,7 @@ def write_spread_low_to_xlsx():
     for i in range(0, len(fut_df)):
         fut_code = fut_df.loc[i]["fut_code"]
         sql = "select distinct spread_type from fut_spread_daily where fut_code = '{}' order by spread_type;".format(fut_code)
-        spread_type_df = read_data(engine_ts, 'fut_spread_daily', sql)
+        spread_type_df = read_data(engine_ts, sql)
         spread_num = len(spread_type_df)
         spread_num_dict[fut_code] = spread_num
         
@@ -46,7 +46,7 @@ def write_spread_low_to_xlsx():
         for j in range(0, spread_num):
             spread_type = spread_type_df.loc[j]['spread_type']
             sql = "select close from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by close;".format(fut_code, spread_type)
-            df = read_data(engine_ts, 'fut_spread_daily', sql)
+            df = read_data(engine_ts, sql)
             num = len(df)
             data_list = [spread_type.replace('-', '--') + '汇总', spread_type[:2], df.loc[max(round(num * 0.05), 1) - 1]['close'], df.loc[max(round(num * 0.1), 1) - 1]['close'],
                         df.loc[max(round(num * 0.15), 1) - 1]['close'], df.loc[max(round(num * 0.2), 1) - 1]['close'], df.loc[0]['close'], df.loc[num - 1]['close']]
@@ -60,7 +60,7 @@ def write_spread_low_to_xlsx():
             
         # 写入总计数据
         sql = "select close from fut_spread_daily where fut_code = '{}' order by close;".format(fut_code)
-        df = read_data(engine_ts, 'fut_spread_daily', sql)
+        df = read_data(engine_ts, sql)
         num = len(df)
         data_list = ['总计', '/', df.loc[max(round(num * 0.05), 1) - 1]['close'], df.loc[max(round(num * 0.1), 1) - 1]['close'],
                      df.loc[max(round(num * 0.15), 1) - 1]['close'], df.loc[max(round(num * 0.2), 1) - 1]['close'], df.loc[0]['close'], df.loc[num - 1]['close']]
@@ -138,31 +138,32 @@ def write_spread_low_to_xlsx():
     
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
-    wb.save('./{}-所有品种历史价差走势.xlsx'.format(todayStr))
+    wb.save('./{}-所有品种历史最低价差统计分析.xlsx'.format(todayStr))
     wb.close()
     app.quit()
-    print('Excel 数据导出完毕！')
+    print('所有品种历史最低价差统计分析 Excel 数据导出完毕！')
     
 # 将指定组合合约价差日行情数据导出到 excel 中
 def write_spread_daily_to_xlsx(fut_code):
     engine_ts = creat_engine_with_database('futures')
     sql = "select distinct spread_type from fut_spread_daily where fut_code = '{}' order by spread_type desc;".format(fut_code)
-    spread_type_df = read_data(engine_ts, 'fut_spread_daily', sql)
+    spread_type_df = read_data(engine_ts, sql)
     app = xw.App(visible=True,add_book=False)
     wb = app.books.add()
+    code_num = len(fut_code)
     
     for i in range(0, len(spread_type_df)):
         spread_type = spread_type_df.loc[i]['spread_type']
         sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code;".format(fut_code, spread_type)
-        ts_code_df = read_data(engine_ts, 'fut_spread_daily', sql)
+        ts_code_df = read_data(engine_ts, sql)
         
         cnt_of_code = len(ts_code_df)
         title = ['统一日期']
         for j in range(0, cnt_of_code):
-            title.append(ts_code_df.loc[j]['ts_code'][2:4] + '年价差')
+            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年价差')
         title.append('统一日期')
         for j in range(0, cnt_of_code):
-            title.append(ts_code_df.loc[j]['ts_code'][2:4] + '年一腿价格')
+            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年一腿价格')
         ws = wb.sheets.add(spread_type)
         ws.range('A1').value = title
         rng = ws.range('A1').expand()
@@ -172,14 +173,15 @@ def write_spread_daily_to_xlsx(fut_code):
         # 获取多年同跨月类型合约组合交易日的并集（为了展示在一张散点图上），并获取分合约组合分交易日期的收盘价差字典
         date_set = set()
         comb_dict = {}
+        start_year = {}
         for j in range(0, cnt_of_code):
             ts_code = ts_code_df.loc[j]['ts_code']
             sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
-            df = read_data(engine_ts, 'fut_spread_daily', sql)
-            start_year = df.loc[0]['trade_date'][2:4]
+            df = read_data(engine_ts, sql)
+            start_year[j] = df.loc[0]['trade_date'][2:4]
             close_dict = {}
             for k in range(0, len(df)):
-                if df.loc[k]['trade_date'][2:4] > start_year:
+                if df.loc[k]['trade_date'][2:4] > start_year[j]:
                     date = '31' + df.loc[k]['trade_date'][-4:]
                 else:
                     date = '30' + df.loc[k]['trade_date'][-4:]
@@ -197,19 +199,15 @@ def write_spread_daily_to_xlsx(fut_code):
             first_leg_list = [first_leg + '%']
             sql = "select trade_date, close from fut_daily where ts_code like %(tt)s and close is not NULL order by trade_date;"
             df = pd.read_sql_query(sql, engine_ts, params={'tt':first_leg_list})
-            start_year = df.loc[0]['trade_date'][2:4] # todo
             close_dict = {}
             for k in range(0, len(df)):
-                if df.loc[k]['trade_date'][2:4] > start_year:
+                if df.loc[k]['trade_date'][2:4] > start_year[j]:
                     date = '31' + df.loc[k]['trade_date'][-4:]
                 else:
                     date = '30' + df.loc[k]['trade_date'][-4:]
                 close_dict[date] = df.loc[k]['close']
                 lowest = min(lowest, df.loc[k]['close'])
             first_dict[first_leg] = close_dict
-        if spread_type == '11-01':
-            print(first_dict)
-            exit(1)
         
         # 在 excel 中填入多组合约组合的价差以及一腿价格日行情数据
         for j in range(0, len(date_list)):
@@ -222,7 +220,7 @@ def write_spread_daily_to_xlsx(fut_code):
                     close_list[k + 1] = comb_dict[ts_code][date]
                 first_leg = ts_code[:ts_code.index('-')]
                 if date in first_dict[first_leg]:
-                    close_list[k + 5] = first_dict[first_leg][date]
+                    close_list[k + cnt_of_code + 2] = first_dict[first_leg][date]
             ws.range('A' + str(j + 2)).value = close_list
         ws.autofit()
         
@@ -267,19 +265,20 @@ def write_spread_daily_to_xlsx(fut_code):
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
         chart.api[1].Axes(2).MinimumScale = lowest - 500
         
-        print('{} {} 跨月类别数据写入完成！进度：{}%'.format(fut_code, spread_type, format(i / len(spread_type_df) * 100, '.2f')))
+        print('{} {} 跨月价差数据写入完成！进度：{}%'.format(fut_code, spread_type, format(i / len(spread_type_df) * 100, '.2f')))
         
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
-    wb.save('./{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(fut_code, todayStr))
+    wb.sheets['Sheet1'].delete()
+    wb.save('./{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
     wb.close()
     app.quit()
-    exit(1)
+    print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
 
 def main():
     # write_spread_low_to_xlsx()
     
-    write_spread_daily_to_xlsx('SR')
+    write_spread_daily_to_xlsx('SP')
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-18
+# @Last Modified time: 2023-10-20
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -18,7 +18,7 @@ def creat_engine_with_database(database):
     return engine_ts
 
 # 获取指定数据库的指定表格内容
-def read_data(engine_ts, tableName, sql):
+def read_data(engine_ts, sql):
     df = pd.read_sql_query(sql, engine_ts)
     return df
 
