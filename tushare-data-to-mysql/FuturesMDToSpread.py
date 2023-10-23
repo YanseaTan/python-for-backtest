@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-13
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-20
+# @Last Modified time: 2023-10-23
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -27,35 +27,9 @@ def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
     ts_code = ins_1[:ins_1.index('.')] + '-' + ins_2[:ins_2.index('.')]
     spread_type = ins_1[:ins_1.index('.')][-2:] + '-' + ins_2[:ins_2.index('.')][-2:]
     # 当数据表不为空，需要新增数据时使用，适用于有可能插入重复数据的情况（更慢）
-    ts_code_list = [ts_code]
-    fut_code_list = [fut_code]
-    spread_type_list = [spread_type]
-    trade_date_list = []
-    close_list = []
-    df = pd.DataFrame()
-    
-    for i in range(0, len(date)):
-        trade_date = date.loc[i]['trade_date']
-        spread = close_1[close_1['trade_date'] == trade_date].iat[0, 1] - close_2[close_2['trade_date'] == trade_date].iat[0, 1]
-        trade_date_list.append(trade_date)
-        close_list.append(spread)
-        df['ts_code'] = ts_code_list
-        df['fut_code'] = fut_code_list
-        df['spread_type'] = spread_type_list
-        df['trade_date'] = trade_date_list
-        df['close'] = close_list
-        trade_date_list.clear()
-        close_list.clear()
-        # 写入数据库，避免 Key 重复后报错
-        try:
-            write_data(engine_ts, 'fut_spread_daily', df)
-        except:
-            continue
-    
-    # 当数据表为空时运行，或者保证插入数据不存在重复数据时运行（更快）
-    # ts_code_list = [ts_code] * len(date)
-    # fut_code_list = [fut_code] * len(date)
-    # spread_type_list = [spread_type] * len(date)
+    # ts_code_list = [ts_code]
+    # fut_code_list = [fut_code]
+    # spread_type_list = [spread_type]
     # trade_date_list = []
     # close_list = []
     # df = pd.DataFrame()
@@ -65,14 +39,40 @@ def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
     #     spread = close_1[close_1['trade_date'] == trade_date].iat[0, 1] - close_2[close_2['trade_date'] == trade_date].iat[0, 1]
     #     trade_date_list.append(trade_date)
     #     close_list.append(spread)
-        
-    # df['ts_code'] = ts_code_list
-    # df['fut_code'] = fut_code_list
-    # df['spread_type'] = spread_type_list
-    # df['trade_date'] = trade_date_list
-    # df['close'] = close_list
+    #     df['ts_code'] = ts_code_list
+    #     df['fut_code'] = fut_code_list
+    #     df['spread_type'] = spread_type_list
+    #     df['trade_date'] = trade_date_list
+    #     df['close'] = close_list
+    #     trade_date_list.clear()
+    #     close_list.clear()
+    #     # 写入数据库，避免 Key 重复后报错
+    #     try:
+    #         write_data(engine_ts, 'fut_spread_daily', df)
+    #     except:
+    #         continue
     
-    # write_data(engine_ts, 'fut_spread_daily', df)
+    # 当数据表为空时运行，或者保证插入数据不存在重复数据时运行（更快）
+    ts_code_list = [ts_code] * len(date)
+    fut_code_list = [fut_code] * len(date)
+    spread_type_list = [spread_type] * len(date)
+    trade_date_list = []
+    close_list = []
+    df = pd.DataFrame()
+    
+    for i in range(0, len(date)):
+        trade_date = date.loc[i]['trade_date']
+        spread = close_1[close_1['trade_date'] == trade_date].iat[0, 1] - close_2[close_2['trade_date'] == trade_date].iat[0, 1]
+        trade_date_list.append(trade_date)
+        close_list.append(spread)
+        
+    df['ts_code'] = ts_code_list
+    df['fut_code'] = fut_code_list
+    df['spread_type'] = spread_type_list
+    df['trade_date'] = trade_date_list
+    df['close'] = close_list
+    
+    write_data(engine_ts, 'fut_spread_daily', df)
         
     print('写入完毕！数据量：{} 合约组合：{} '.format(len(date), ts_code))
     
@@ -85,7 +85,7 @@ def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
 # 获取指定品种在指定到期日区间内所有的相邻月组合列表，并将所有合约对在重合交易日的价差数据存入数据库
 def store_spread_daily_by_fut_code(fut_code, start_date, end_date):
     engine_ts = creat_engine_with_database('futures')
-    sql = "select ts_code from fut_basic where fut_code = '{}' and delist_date > '{}' and delist_date < '{}' order by ts_code;".format(fut_code, start_date, end_date)
+    sql = "select ts_code from fut_basic where fut_code = '{}' and list_date > '{}' and list_date < '{}' order by ts_code;".format(fut_code, start_date, end_date)
     code_df = read_data(engine_ts, sql)
     combination_list = []
     for i in range(0, len(code_df) - 1):
@@ -115,7 +115,7 @@ def main():
     fut_df = read_data(engine_ts, sql)
     fut_list = fut_df['fut_code'].tolist()
     for i in range(0, len(fut_list)):
-        store_spread_daily_by_fut_code(fut_list[i], '20200717', '20231017')
+        store_spread_daily_by_fut_code(fut_list[i], '20190723', '20231023')
 
 
 if __name__ == "__main__":

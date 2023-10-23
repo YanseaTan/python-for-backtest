@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-20
+# @Last Modified time: 2023-10-23
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -116,7 +116,7 @@ def write_spread_low_to_xlsx():
         spread_num = spread_num_dict[fut_code]
         ws = wb.sheets[fut_code]
         nRows = ws.range('A' + str(spread_num + 4)).expand('table').rows.count
-        chart = ws.charts.add(480, 330, 600, 300)
+        chart = ws.charts.add(480, 330, 800, 300)
         chart.set_source_data(ws.range((spread_num + 4,2),(spread_num + nRows + 3,6)))
         # Excel VBA 指令
         chart.chart_type = 'xy_scatter_lines_no_markers'
@@ -132,12 +132,13 @@ def write_spread_low_to_xlsx():
         chart.api[1].PlotBy = 1     # 切换数据（为了正确显示）
         chart.api[1].PlotBy = 2
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/m"      # 格式化横坐标显示
-        chart.api[1].Axes(1).MajorUnit = 60     # 横坐标单位值
+        chart.api[1].Axes(1).MajorUnit = 90     # 横坐标单位值
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
         print('{} 品种详细数据图表插入完成！进度：{}%'.format(fut_code, format(i / len(fut_df) * 100, '.2f')))
     
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
+    wb.sheets['Sheet1'].delete()
     wb.save('./{}-所有品种历史最低价差统计分析.xlsx'.format(todayStr))
     wb.close()
     app.quit()
@@ -244,6 +245,7 @@ def write_spread_daily_to_xlsx(fut_code):
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
         chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+        chart.api[1].ChartStyle = 245
         
         chart = ws.charts.add(530, 420, 650, 400)
         chart.set_source_data(ws.range((1,cnt_of_code + 2),(cnt_of_date + 1,cnt_of_code * 2 + 2)))
@@ -264,6 +266,7 @@ def write_spread_daily_to_xlsx(fut_code):
         chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
         chart.api[1].Axes(2).MinimumScale = lowest - 500
+        chart.api[1].ChartStyle = 245
         
         print('{} {} 跨月价差数据写入完成！进度：{}%'.format(fut_code, spread_type, format(i / len(spread_type_df) * 100, '.2f')))
         
@@ -278,7 +281,7 @@ def write_spread_daily_to_xlsx(fut_code):
 def main():
     # write_spread_low_to_xlsx()
     
-    write_spread_daily_to_xlsx('SP')
+    write_spread_daily_to_xlsx('SR')
 
 
 if __name__ == "__main__":

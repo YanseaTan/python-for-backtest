@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-20
+# @Last Modified time: 2023-10-23
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -31,10 +31,8 @@ def update_spread_config():
             close_df = read_data(engine_ts, sql)
             num = len(close_df)
             spread_price_list.append(close_df.loc[max(round(num * 0.1), 1) - 1]['close'])
-        # spread_dict = {}
         ops_json[i]['SpreadType'] = spread_type_list
         ops_json[i]['RecPrice'] = spread_price_list
-        # ops_json[i]["RecommendSpread"] = spread_dict
         print('{} 价差配置写入成功，文件更新进度：{}%'.format(fut_code, format(i / len(ops_json) * 100, '.2f')))
     
     f = open('./productOps.json', 'w')

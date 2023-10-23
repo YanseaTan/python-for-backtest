@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-20
+# @Last Modified time: 2023-10-23
 
 import time
 import datetime
@@ -14,13 +14,12 @@ from DatabaseTools import *
 # Tushare 账户 token
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
-# 获取昨天的日期
-def getYesterday():
+# 获取上一交易日的日期
+def get_last_trade_date():
    today = datetime.date.today()
-   oneday = datetime.timedelta(days=1)
-   yesterday = today - oneday
-   yesterdaystr = yesterday.strftime('%Y%m%d')
-   return yesterdaystr
+   todayStr = today.strftime('%Y%m%d')
+   df = pro.trade_cal(**{"cal_date":todayStr}, fields=["pretrade_date"])
+   return df.loc[0]['pretrade_date']
 
 # 获取股票基本信息
 def get_stock_basic_data():
@@ -108,9 +107,9 @@ def get_fut_md_data(trade_date = ''):
         
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_md_data():
-    yesterday = getYesterday()
-    get_cb_md_data(yesterday)
-    get_fut_md_data(yesterday)
+    last_trade_date = get_last_trade_date()
+    get_cb_md_data(last_trade_date)
+    get_fut_md_data(last_trade_date)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口
