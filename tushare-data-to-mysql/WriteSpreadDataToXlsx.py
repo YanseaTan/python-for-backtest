@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-23
+# @Last Modified time: 2023-10-24
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -90,7 +90,7 @@ def write_spread_low_to_xlsx():
         chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
         chart.api[1].Axes(1).MajorUnit = 1      # 横坐标单位值
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
-        print('{} 品种汇总数据写入完成！进度：{}%'.format(fut_code, format(i / len(fut_df) * 100, '.2f')))
+        print('{} 品种汇总数据写入完成！进度：{}%'.format(fut_code, format((i + 1) / len(fut_df) * 100, '.2f')))
         
     # 写入所有合约组合的详细最低价差数据
     cnt = len(code_df)
@@ -108,7 +108,7 @@ def write_spread_low_to_xlsx():
                      df.loc[max(round(num * 0.15), 1) - 1]['close'], df.loc[max(round(num * 0.2), 1) - 1]['close'], df.loc[0]['close'], df.loc[num - 1]['close']]
         ws.range('A' + str(nRows + 1)).value = data_list
         ws.autofit()
-        print('写入详细价差数据，进度：{}%'.format(format(i / cnt * 100, '.2f')))
+        print('写入详细价差数据，进度：{}%'.format(format((i + 1) / cnt * 100, '.2f')))
     
     # 按品种插入所有合约组合详细数据的连续最低价差数据
     for i in range(0, len(fut_df)):
@@ -134,7 +134,7 @@ def write_spread_low_to_xlsx():
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/m"      # 格式化横坐标显示
         chart.api[1].Axes(1).MajorUnit = 90     # 横坐标单位值
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
-        print('{} 品种详细数据图表插入完成！进度：{}%'.format(fut_code, format(i / len(fut_df) * 100, '.2f')))
+        print('{} 品种详细数据图表插入完成！进度：{}%'.format(fut_code, format((i + 1) / len(fut_df) * 100, '.2f')))
     
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
@@ -157,6 +157,12 @@ def write_spread_daily_to_xlsx(fut_code):
         spread_type = spread_type_df.loc[i]['spread_type']
         sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code;".format(fut_code, spread_type)
         ts_code_df = read_data(engine_ts, sql)
+        
+        # 只保留临近四年的合约组合
+        while len(ts_code_df) > 4:
+            ts_code_df.drop([0], inplace=True)
+            # 重置序号，不然会报错
+            ts_code_df = ts_code_df.reset_index(drop=True)
         
         cnt_of_code = len(ts_code_df)
         title = ['统一日期']
@@ -268,7 +274,7 @@ def write_spread_daily_to_xlsx(fut_code):
         chart.api[1].Axes(2).MinimumScale = lowest - 500
         chart.api[1].ChartStyle = 245
         
-        print('{} {} 跨月价差数据写入完成！进度：{}%'.format(fut_code, spread_type, format(i / len(spread_type_df) * 100, '.2f')))
+        print('{} {} 跨月价差数据写入完成！进度：{}%'.format(fut_code, spread_type, format((i + 1) / len(spread_type_df) * 100, '.2f')))
         
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
@@ -281,7 +287,11 @@ def write_spread_daily_to_xlsx(fut_code):
 def main():
     # write_spread_low_to_xlsx()
     
-    write_spread_daily_to_xlsx('SR')
+    # fut_list = ['SR', 'M', 'TA', 'V', 'SN', 'NI', 'FU']
+    # for i in range(0, len(fut_list)):
+    #     write_spread_daily_to_xlsx(fut_list[i])
+        
+    write_spread_daily_to_xlsx('FU')
 
 
 if __name__ == "__main__":
