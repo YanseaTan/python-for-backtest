@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-24
+# @Last Modified time: 2023-10-26
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -138,8 +138,9 @@ def write_spread_low_to_xlsx():
     
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
-    wb.sheets['Sheet1'].delete()
-    wb.save('./{}-所有品种历史最低价差统计分析.xlsx'.format(todayStr))
+    if len(wb.sheets) > 1:
+        wb.sheets['Sheet1'].delete()
+    wb.save('./output/{}-所有品种历史最低价差统计分析.xlsx'.format(todayStr))
     wb.close()
     app.quit()
     print('所有品种历史最低价差统计分析 Excel 数据导出完毕！')
@@ -278,20 +279,26 @@ def write_spread_daily_to_xlsx(fut_code):
         
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
-    wb.sheets['Sheet1'].delete()
-    wb.save('./{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
+    if len(wb.sheets) > 1:
+        wb.sheets['Sheet1'].delete()
+    wb.save('./output/{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
     wb.close()
     app.quit()
     print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
 
+def write_all_spread_daily_to_xlsx():
+    engine_ts = creat_engine_with_database('futures')
+    sql = "select distinct fut_code from fut_basic order by fut_code desc;"
+    fut_df = read_data(engine_ts, sql)
+    # fut_list = ['SR', 'M', 'TA', 'V', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'SA', 'BU', 'MA']
+    fut_list = fut_df['fut_code'].tolist()
+    for i in range(0, len(fut_list)):
+        write_spread_daily_to_xlsx(fut_list[i])
+
 def main():
-    # write_spread_low_to_xlsx()
+    write_spread_low_to_xlsx()
     
-    # fut_list = ['SR', 'M', 'TA', 'V', 'SN', 'NI', 'FU']
-    # for i in range(0, len(fut_list)):
-    #     write_spread_daily_to_xlsx(fut_list[i])
-        
-    write_spread_daily_to_xlsx('FU')
+    # write_all_spread_daily_to_xlsx()
 
 
 if __name__ == "__main__":
