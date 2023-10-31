@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-13
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-24
+# @Last Modified time: 2023-10-27
 
 import pandas as pd
 import tushare as ts
@@ -84,6 +84,7 @@ def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
     df['close'] = close_list
     
     write_data(engine_ts, 'fut_spread_daily', df)
+    # write_data(engine_ts, 'au_spread', df)
         
     print('写入完毕！数据量：{} 合约组合：{} '.format(len(date), ts_code), end='')
     
@@ -166,6 +167,13 @@ def main():
     
     last_trade_date = get_last_trade_date()
     update_spread_daily_data(last_trade_date)
+    
+    # combination_list = [['AU2012.SHF', 'AU2102.SHF'], ['AU2112.SHF', 'AU2202.SHF'], ['AU2212.SHF', 'AU2302.SHF'], ['AU2312.SHF', 'AU2402.SHF']]
+    # for i in range(0, len(combination_list)):
+    #     ins_1 = combination_list[i][0]
+    #     ins_2 = combination_list[i][1]
+    #     store_spread_daily_by_ts_code('AU', ins_1, ins_2)
+    #     print('总进度：{}%'.format(format((i + 1) / len(combination_list) * 100, '.2f')))
 
 
 if __name__ == "__main__":

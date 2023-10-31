@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-26
+# @Last Modified time: 2023-10-31
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -296,9 +296,8 @@ def write_all_spread_daily_to_xlsx():
         write_spread_daily_to_xlsx(fut_list[i])
 
 def main():
-    write_spread_low_to_xlsx()
-    
-    # write_all_spread_daily_to_xlsx()
+    write_all_spread_daily_to_xlsx()
+    # write_spread_low_to_xlsx()
 
 
 if __name__ == "__main__":
