@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-13
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-27
+# @Last Modified time: 2023-11-13
 
 import pandas as pd
 import tushare as ts
@@ -15,12 +15,26 @@ from DatabaseTools import *
 # Tushare 账户 token
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
-# 获取上一交易日的日期
-def get_last_trade_date():
-   today = datetime.date.today()
-   todayStr = today.strftime('%Y%m%d')
-   df = pro.trade_cal(**{"cal_date":todayStr}, fields=["pretrade_date"])
-   return df.loc[0]['pretrade_date']
+# 获取所有价差日行情数据库中缺少的交易日期合集
+def get_trade_days():
+    engine_ts = creat_engine_with_database('futures')
+    sql = 'select distinct trade_date from fut_spread_daily order by trade_date desc limit 1'
+    last_trade_date_df = read_data(engine_ts, sql)
+    last_trade_date = last_trade_date_df.loc[0]['trade_date']
+    today = datetime.date.today()
+    oneday = datetime.timedelta(days=1)
+    i = 0
+    trade_date_set = set()
+    while True:
+        date = today - i * oneday
+        i += 1
+        dateStr = date.strftime('%Y%m%d')
+        df = pro.trade_cal(**{"cal_date":dateStr}, fields=["pretrade_date"])
+        if df.loc[0]['pretrade_date'] != last_trade_date:
+            trade_date_set.add(df.loc[0]['pretrade_date'])
+        else :
+            break
+    return trade_date_set
     
 # 获取指定两个合约在所有重合交易日的价差数据，并存入数据库
 def store_spread_daily_by_ts_code(fut_code, ins_1, ins_2):
@@ -154,7 +168,7 @@ def update_spread_daily_data(last_trade_date):
                 
                     write_data(engine_ts, 'fut_spread_daily', df)
                     
-        print('{} 品种日价差数据写入完毕！总进度：{}%'.format(fut_code, format((i + 1) / len(fut_list) * 100, '.2f')))
+        print('{}-{} 品种日价差数据写入完毕！总进度：{}%'.format(last_trade_date, fut_code, format((i + 1) / len(fut_list) * 100, '.2f')))
 
 def main():
     # 导入所选时间内所有合约组合的日行情价差数据到数据库中
@@ -165,8 +179,9 @@ def main():
     # for i in range(0, len(fut_list)):
     #     store_spread_daily_by_fut_code(fut_list[i], '20190723', '20231024')
     
-    last_trade_date = get_last_trade_date()
-    update_spread_daily_data(last_trade_date)
+    trade_date_set = get_trade_days()
+    for trade_date in trade_date_set:
+        update_spread_daily_data(trade_date)
     
     # combination_list = [['AU2012.SHF', 'AU2102.SHF'], ['AU2112.SHF', 'AU2202.SHF'], ['AU2212.SHF', 'AU2302.SHF'], ['AU2312.SHF', 'AU2402.SHF']]
     # for i in range(0, len(combination_list)):

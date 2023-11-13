@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-24
+# @Last Modified time: 2023-11-13
 
 import time
 import datetime
@@ -14,12 +14,26 @@ from DatabaseTools import *
 # Tushare 账户 token
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
-# 获取上一交易日的日期
-def get_last_trade_date():
-   today = datetime.date.today()
-   todayStr = today.strftime('%Y%m%d')
-   df = pro.trade_cal(**{"cal_date":todayStr}, fields=["pretrade_date"])
-   return df.loc[0]['pretrade_date']
+# 获取所有日行情数据库中缺少的交易日期合集
+def get_trade_days():
+    engine_ts = creat_engine_with_database('bond')
+    sql = 'select distinct trade_date from cb_daily order by trade_date desc limit 1'
+    last_trade_date_df = read_data(engine_ts, sql)
+    last_trade_date = last_trade_date_df.loc[0]['trade_date']
+    today = datetime.date.today()
+    oneday = datetime.timedelta(days=1)
+    i = 0
+    trade_date_set = set()
+    while True:
+        date = today - i * oneday
+        i += 1
+        dateStr = date.strftime('%Y%m%d')
+        df = pro.trade_cal(**{"cal_date":dateStr}, fields=["pretrade_date"])
+        if df.loc[0]['pretrade_date'] != last_trade_date:
+            trade_date_set.add(df.loc[0]['pretrade_date'])
+        else :
+            break
+    return trade_date_set
 
 # 获取所有股票基本信息
 def get_stock_basic_data():
@@ -155,9 +169,10 @@ def update_daily_data():
     update_cb_basic_data()
     update_fut_basic_data()
     
-    last_trade_date = get_last_trade_date()
-    get_cb_md_data(last_trade_date)
-    get_fut_md_data(last_trade_date)
+    trade_date_set = get_trade_days()
+    for trade_date in trade_date_set:
+        get_cb_md_data(trade_date)
+        get_fut_md_data(trade_date)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-10-31
+# @Last Modified time: 2023-11-13
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -287,11 +287,12 @@ def write_spread_daily_to_xlsx(fut_code):
     print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
 
 def write_all_spread_daily_to_xlsx():
-    engine_ts = creat_engine_with_database('futures')
-    sql = "select distinct fut_code from fut_basic order by fut_code desc;"
-    fut_df = read_data(engine_ts, sql)
-    # fut_list = ['SR', 'M', 'TA', 'V', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'SA', 'BU', 'MA']
-    fut_list = fut_df['fut_code'].tolist()
+    # engine_ts = creat_engine_with_database('futures')
+    # sql = "select distinct fut_code from fut_basic order by fut_code desc;"
+    # fut_df = read_data(engine_ts, sql)
+    # fut_list = fut_df['fut_code'].tolist()
+    # fut_list = ['RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
+    fut_list = ['RB', 'v']
     for i in range(0, len(fut_list)):
         write_spread_daily_to_xlsx(fut_list[i])
 
