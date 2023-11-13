@@ -15,7 +15,7 @@ from DatabaseTools import *
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
 # 获取所有日行情数据库中缺少的交易日期合集
-def get_trade_days():
+def get_trade_date_set():
     engine_ts = creat_engine_with_database('bond')
     sql = 'select distinct trade_date from cb_daily order by trade_date desc limit 1'
     last_trade_date_df = read_data(engine_ts, sql)
@@ -169,7 +169,7 @@ def update_daily_data():
     update_cb_basic_data()
     update_fut_basic_data()
     
-    trade_date_set = get_trade_days()
+    trade_date_set = get_trade_date_set()
     for trade_date in trade_date_set:
         get_cb_md_data(trade_date)
         get_fut_md_data(trade_date)

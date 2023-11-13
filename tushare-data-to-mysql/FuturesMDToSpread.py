@@ -16,7 +16,7 @@ from DatabaseTools import *
 token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
 
 # 获取所有价差日行情数据库中缺少的交易日期合集
-def get_trade_days():
+def get_trade_date_set():
     engine_ts = creat_engine_with_database('futures')
     sql = 'select distinct trade_date from fut_spread_daily order by trade_date desc limit 1'
     last_trade_date_df = read_data(engine_ts, sql)
@@ -179,7 +179,7 @@ def main():
     # for i in range(0, len(fut_list)):
     #     store_spread_daily_by_fut_code(fut_list[i], '20190723', '20231024')
     
-    trade_date_set = get_trade_days()
+    trade_date_set = get_trade_date_set()
     for trade_date in trade_date_set:
         update_spread_daily_data(trade_date)
     
