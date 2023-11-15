@@ -2,11 +2,12 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-13
+# @Last Modified time: 2023-11-15
 
 from sqlalchemy import create_engine
 import xlwings as xw
 import datetime
+import os
 from DatabaseTools import *
 
 # 根据合约组合名称返回该组合的所有日行情信息
@@ -165,23 +166,11 @@ def write_spread_daily_to_xlsx(fut_code):
             # 重置序号，不然会报错
             ts_code_df = ts_code_df.reset_index(drop=True)
         
-        cnt_of_code = len(ts_code_df)
-        title = ['统一日期']
-        for j in range(0, cnt_of_code):
-            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年价差')
-        title.append('统一日期')
-        for j in range(0, cnt_of_code):
-            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年一腿价格')
-        ws = wb.sheets.add(spread_type)
-        ws.range('A1').value = title
-        rng = ws.range('A1').expand()
-        for j in range(0, len(title)):
-            rng.columns[j][0].color = (211, 211, 211)
-        
         # 获取多年同跨月类型合约组合交易日的并集（为了展示在一张散点图上），并获取分合约组合分交易日期的收盘价差字典
         date_set = set()
         comb_dict = {}
         start_year = {}
+        cnt_of_code = len(ts_code_df)
         for j in range(0, cnt_of_code):
             ts_code = ts_code_df.loc[j]['ts_code']
             sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
@@ -196,7 +185,22 @@ def write_spread_daily_to_xlsx(fut_code):
                 date_set.add(date)
                 close_dict[date] = df.loc[k]['close']
             comb_dict[ts_code] = close_dict
+        # 交易日并集小于 60 天的不纳入统计中
+        if len(date_set) < 60:
+            continue
         date_list = sorted(date_set)
+        
+        title = ['统一日期']
+        for j in range(0, cnt_of_code):
+            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年价差')
+        title.append('统一日期')
+        for j in range(0, cnt_of_code):
+            title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年一腿价格')
+        ws = wb.sheets.add(spread_type)
+        ws.range('A1').value = title
+        rng = ws.range('A1').expand()
+        for j in range(0, len(title)):
+            rng.columns[j][0].color = (211, 211, 211)
         
         # 一腿价格字典
         first_dict = {}
@@ -218,6 +222,7 @@ def write_spread_daily_to_xlsx(fut_code):
             first_dict[first_leg] = close_dict
         
         # 在 excel 中填入多组合约组合的价差以及一腿价格日行情数据
+        data_list = []
         for j in range(0, len(date_list)):
             date = date_list[j]
             date_str = '20' + date[:2] + '/' + date[2:4] + '/' + date[-2:]
@@ -229,7 +234,8 @@ def write_spread_daily_to_xlsx(fut_code):
                 first_leg = ts_code[:ts_code.index('-')]
                 if date in first_dict[first_leg]:
                     close_list[k + cnt_of_code + 2] = first_dict[first_leg][date]
-            ws.range('A' + str(j + 2)).value = close_list
+            data_list.append(close_list)
+        ws.range('A2').value = data_list
         ws.autofit()
         
         # 插入散点图
@@ -281,7 +287,9 @@ def write_spread_daily_to_xlsx(fut_code):
     todayStr = today.strftime('%Y%m%d')
     if len(wb.sheets) > 1:
         wb.sheets['Sheet1'].delete()
-    wb.save('./output/{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
+    if not os.path.exists('output/{}/所有品种价差季节性走势/'.format(todayStr)):
+        os.makedirs('output/{}/所有品种价差季节性走势/'.format(todayStr))
+    wb.save('./output/{}/所有品种价差季节性走势/{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, todayStr, fut_code))
     wb.close()
     app.quit()
     print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
@@ -291,8 +299,8 @@ def write_all_spread_daily_to_xlsx():
     # sql = "select distinct fut_code from fut_basic order by fut_code desc;"
     # fut_df = read_data(engine_ts, sql)
     # fut_list = fut_df['fut_code'].tolist()
-    # fut_list = ['RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
-    fut_list = ['RB', 'v']
+    # fut_list = ['RB', 'RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
+    fut_list = ['SF', 'SM', 'SP', 'SS']
     for i in range(0, len(fut_list)):
         write_spread_daily_to_xlsx(fut_list[i])
 
