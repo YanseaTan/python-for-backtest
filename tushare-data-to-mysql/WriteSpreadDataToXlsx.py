@@ -2,13 +2,14 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-15
+# @Last Modified time: 2023-11-17
 
 from sqlalchemy import create_engine
 import xlwings as xw
 import datetime
 import os
 from DatabaseTools import *
+import numpy as np
 
 # 根据合约组合名称返回该组合的所有日行情信息
 def get_spread_daily_by_ts_code(ts_code, index):
@@ -185,8 +186,8 @@ def write_spread_daily_to_xlsx(fut_code):
                 date_set.add(date)
                 close_dict[date] = df.loc[k]['close']
             comb_dict[ts_code] = close_dict
-        # 交易日并集小于 60 天的不纳入统计中
-        if len(date_set) < 60:
+        # 交易日并集小于 90 天的不纳入统计中
+        if len(date_set) < 90:
             continue
         date_list = sorted(date_set)
         
@@ -294,19 +295,317 @@ def write_spread_daily_to_xlsx(fut_code):
     app.quit()
     print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
 
+def test():
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.add()
+    fut_code = 'MA'
+    code_num = 2
+    
+    engine_ts = creat_engine_with_database('futures')
+    spread_type = '01-02'
+    sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code;".format(fut_code, spread_type)
+    ts_code_df = read_data(engine_ts, sql)
+    
+    # 只保留临近四年的合约组合
+    while len(ts_code_df) > 4:
+        ts_code_df.drop([0], inplace=True)
+        # 重置序号，不然会报错
+        ts_code_df = ts_code_df.reset_index(drop=True)
+    
+    # 获取多年同跨月类型合约组合交易日的并集（为了展示在一张散点图上），并获取分合约组合分交易日期的收盘价差字典
+    date_set = set()
+    comb_dict = {}
+    start_year = {}
+    cnt_of_code = len(ts_code_df)
+    for j in range(0, cnt_of_code):
+        ts_code = ts_code_df.loc[j]['ts_code']
+        sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
+        df = read_data(engine_ts, sql)
+        start_year[j] = df.loc[0]['trade_date'][2:4]
+        start_date = df.loc[0]['trade_date']
+        end_date = df.loc[len(df) - 1]['trade_date']
+        sql = "select update_date, value from fut_funds where index_name = '甲醇-港口库存' and update_date >= '{}' and update_date <= '{}' order by update_date;".format(start_date, end_date)
+        data = read_data(engine_ts, sql)
+        print(data)
+        exit(1)
+        close_dict = {}
+        for k in range(0, len(df)):
+            if df.loc[k]['trade_date'][2:4] > start_year[j]:
+                date = '31' + df.loc[k]['trade_date'][-4:]
+            else:
+                date = '30' + df.loc[k]['trade_date'][-4:]
+            date_set.add(date)
+            close_dict[date] = df.loc[k]['close']
+        comb_dict[ts_code] = close_dict
+    date_list = sorted(date_set)
+    
+    # 库存测试
+    inventory_dict = {}
+    sql = "select update_date, value from fut_funds where index_name = '甲醇-港口库存' and update_date > '20191231' order by update_date;"
+    df = read_data(engine_ts, sql)
+        
+    
+    title = ['统一日期']
+    for j in range(0, cnt_of_code):
+        title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年价差')
+    title.append('统一日期')
+    for j in range(0, cnt_of_code):
+        title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年一腿价格')
+    ws = wb.sheets.add(spread_type)
+    ws.range('A1').value = title
+    rng = ws.range('A1').expand()
+    for j in range(0, len(title)):
+        rng.columns[j][0].color = (211, 211, 211)
+    
+    # 一腿价格字典
+    first_dict = {}
+    lowest = 99999
+    for j in range(0, cnt_of_code):
+        ts_code = ts_code_df.loc[j]['ts_code']
+        first_leg = ts_code[:ts_code.index('-')]
+        first_leg_list = [first_leg + '%']
+        sql = "select trade_date, close from fut_daily where ts_code like %(tt)s and close is not NULL order by trade_date;"
+        df = pd.read_sql_query(sql, engine_ts, params={'tt':first_leg_list})
+        close_dict = {}
+        for k in range(0, len(df)):
+            if df.loc[k]['trade_date'][2:4] > start_year[j]:
+                date = '31' + df.loc[k]['trade_date'][-4:]
+            else:
+                date = '30' + df.loc[k]['trade_date'][-4:]
+            close_dict[date] = df.loc[k]['close']
+            lowest = min(lowest, df.loc[k]['close'])
+        first_dict[first_leg] = close_dict
+    
+    # 在 excel 中填入多组合约组合的价差以及一腿价格日行情数据
+    data_list = []
+    for j in range(0, len(date_list)):
+        date = date_list[j]
+        date_str = '20' + date[:2] + '/' + date[2:4] + '/' + date[-2:]
+        close_list = [date_str] + [''] * cnt_of_code + [date_str] + [''] * cnt_of_code
+        for k in range(0, cnt_of_code):
+            ts_code = ts_code_df.loc[k]['ts_code']
+            if date in comb_dict[ts_code]:
+                close_list[k + 1] = comb_dict[ts_code][date]
+            first_leg = ts_code[:ts_code.index('-')]
+            if date in first_dict[first_leg]:
+                close_list[k + cnt_of_code + 2] = first_dict[first_leg][date]
+        data_list.append(close_list)
+    ws.range('A2').value = data_list
+    ws.autofit()
+    
+    # 插入散点图
+    cnt_of_date = len(date_list)
+    chart = ws.charts.add(530, 10, 650, 400)
+    chart.set_source_data(ws.range((1,1),(cnt_of_date + 1,cnt_of_code + 1)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = fut_code + ' ' + spread_type + ' 价差季节性走势（汇总）'     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+    chart.api[1].ChartStyle = 245
+    
+    chart = ws.charts.add(530, 420, 650, 400)
+    chart.set_source_data(ws.range((1,cnt_of_code + 2),(cnt_of_date + 1,cnt_of_code * 2 + 2)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = '一腿价格季节性走势（汇总）'     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+    chart.api[1].Axes(2).MinimumScale = lowest - 500
+    chart.api[1].ChartStyle = 245
+    
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    if len(wb.sheets) > 1:
+        wb.sheets['Sheet1'].delete()
+    wb.save('./output/{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
+    wb.close()
+    app.quit()
+    print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
+
+def test_dataclean():
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.add()
+    fut_code = 'M'
+    code_num = 1
+    
+    engine_ts = creat_engine_with_database('futures')
+    spread_type = '01-03'
+    sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code;".format(fut_code, spread_type)
+    ts_code_df = read_data(engine_ts, sql)
+    
+    # 只保留临近四年的合约组合
+    while len(ts_code_df) > 4:
+        ts_code_df.drop([0], inplace=True)
+        # 重置序号，不然会报错
+        ts_code_df = ts_code_df.reset_index(drop=True)
+    
+    # 获取多年同跨月类型合约组合交易日的并集（为了展示在一张散点图上），并获取分合约组合分交易日期的收盘价差字典
+    date_set = set()
+    comb_dict = {}
+    start_year = {}
+    cnt_of_code = len(ts_code_df)
+    for j in range(0, cnt_of_code):
+        ts_code = ts_code_df.loc[j]['ts_code']
+        sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
+        df = read_data(engine_ts, sql)
+        me = np.median(df['close'])
+        mad = np.median(abs(df['close'] - me))
+        up = me + (2*mad)
+        down = me - (2*mad)
+        df.drop(df[((df.close < down) | (df.close > up))].index, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        # df['close'] = np.where(df['close']>up,up,df['close'])
+        # df['close'] = np.where(df['close']<down,down,df['close'])
+        start_year[j] = df.loc[0]['trade_date'][2:4]
+        close_dict = {}
+        for k in range(0, len(df)):
+            if df.loc[k]['trade_date'][2:4] > start_year[j]:
+                date = '31' + df.loc[k]['trade_date'][-4:]
+            else:
+                date = '30' + df.loc[k]['trade_date'][-4:]
+            date_set.add(date)
+            close_dict[date] = df.loc[k]['close']
+        comb_dict[ts_code] = close_dict
+    date_list = sorted(date_set)
+    
+    title = ['统一日期']
+    for j in range(0, cnt_of_code):
+        title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年价差')
+    title.append('统一日期')
+    for j in range(0, cnt_of_code):
+        title.append(ts_code_df.loc[j]['ts_code'][code_num:code_num + 2] + '年一腿价格')
+    ws = wb.sheets.add(spread_type)
+    ws.range('A1').value = title
+    rng = ws.range('A1').expand()
+    for j in range(0, len(title)):
+        rng.columns[j][0].color = (211, 211, 211)
+    
+    # 一腿价格字典
+    first_dict = {}
+    lowest = 99999
+    for j in range(0, cnt_of_code):
+        ts_code = ts_code_df.loc[j]['ts_code']
+        first_leg = ts_code[:ts_code.index('-')]
+        first_leg_list = [first_leg + '%']
+        sql = "select trade_date, close from fut_daily where ts_code like %(tt)s and close is not NULL order by trade_date;"
+        df = pd.read_sql_query(sql, engine_ts, params={'tt':first_leg_list})
+        close_dict = {}
+        for k in range(0, len(df)):
+            if df.loc[k]['trade_date'][2:4] > start_year[j]:
+                date = '31' + df.loc[k]['trade_date'][-4:]
+            else:
+                date = '30' + df.loc[k]['trade_date'][-4:]
+            close_dict[date] = df.loc[k]['close']
+            lowest = min(lowest, df.loc[k]['close'])
+        first_dict[first_leg] = close_dict
+    
+    # 在 excel 中填入多组合约组合的价差以及一腿价格日行情数据
+    data_list = []
+    for j in range(0, len(date_list)):
+        date = date_list[j]
+        date_str = '20' + date[:2] + '/' + date[2:4] + '/' + date[-2:]
+        close_list = [date_str] + [''] * cnt_of_code + [date_str] + [''] * cnt_of_code
+        for k in range(0, cnt_of_code):
+            ts_code = ts_code_df.loc[k]['ts_code']
+            if date in comb_dict[ts_code]:
+                close_list[k + 1] = comb_dict[ts_code][date]
+            first_leg = ts_code[:ts_code.index('-')]
+            if date in first_dict[first_leg]:
+                close_list[k + cnt_of_code + 2] = first_dict[first_leg][date]
+        data_list.append(close_list)
+    ws.range('A2').value = data_list
+    ws.autofit()
+    
+    # 插入散点图
+    cnt_of_date = len(date_list)
+    chart = ws.charts.add(530, 10, 650, 400)
+    chart.set_source_data(ws.range((1,1),(cnt_of_date + 1,cnt_of_code + 1)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = fut_code + ' ' + spread_type + ' 价差季节性走势（汇总）'     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+    chart.api[1].ChartStyle = 245
+    
+    chart = ws.charts.add(530, 420, 650, 400)
+    chart.set_source_data(ws.range((1,cnt_of_code + 2),(cnt_of_date + 1,cnt_of_code * 2 + 2)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = '一腿价格季节性走势（汇总）'     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+    chart.api[1].Axes(2).MinimumScale = lowest - 500
+    chart.api[1].ChartStyle = 245
+    
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    if len(wb.sheets) > 1:
+        wb.sheets['Sheet1'].delete()
+    wb.save('./output/{}-{} 品种不同跨月组合价差季节性走势.xlsx'.format(todayStr, fut_code))
+    wb.close()
+    app.quit()
+    print('{} 品种不同跨月组合价差季节性走势 Excel 数据导出完毕！'.format(fut_code))
+
 def write_all_spread_daily_to_xlsx():
-    # engine_ts = creat_engine_with_database('futures')
-    # sql = "select distinct fut_code from fut_basic order by fut_code desc;"
-    # fut_df = read_data(engine_ts, sql)
-    # fut_list = fut_df['fut_code'].tolist()
-    # fut_list = ['RB', 'RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
-    fut_list = ['SF', 'SM', 'SP', 'SS']
+    engine_ts = creat_engine_with_database('futures')
+    sql = "select distinct fut_code from fut_basic order by fut_code desc;"
+    fut_df = read_data(engine_ts, sql)
+    fut_list = fut_df['fut_code'].tolist()
+    # fut_list = ['SF', 'SM', 'SP', 'SS', 'RB', 'RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
     for i in range(0, len(fut_list)):
         write_spread_daily_to_xlsx(fut_list[i])
 
 def main():
-    write_all_spread_daily_to_xlsx()
+    # write_all_spread_daily_to_xlsx()
     # write_spread_low_to_xlsx()
+    
+    # test()
+    test_dataclean()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,19 @@
+[
+  {
+    "fut_code": "MA",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "甲醇-港口库存"
+      },
+      {
+        "type": "basis",
+        "index_name": "甲醇主力合约基差"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "甲醇（江苏低端）"
+      }
+    ]
+  }
+]
