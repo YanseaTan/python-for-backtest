@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-17
+# @Last Modified time: 2023-11-20
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -26,19 +26,31 @@ def update_spread_config():
         spread_price_list = []
         for j in range(0, len(spread_type_df)):
             spread_type = spread_type_df.loc[j]['spread_type']
-            sql = "select trade_date, close from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by trade_date".format(fut_code, spread_type)
-            close_df = read_data(engine_ts, sql)
+            sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code".format(fut_code, spread_type)
+            ts_code_df = read_data(engine_ts, sql)
+            num_of_trade_date = 0
+            close_df = pd.DataFrame()
+            for k in range(0, len(ts_code_df)):
+                ts_code = ts_code_df.loc[k]['ts_code']
+                sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' order by ts_code".format(ts_code)
+                df = read_data(engine_ts, sql)
+                if k == 0:
+                    num_of_trade_date = len(df)
+                    if num_of_trade_date < 66:
+                        break
+                # 去除交割前一个月的数据（如果未达到日期则不去除）
+                df.drop(df[df.index >= (num_of_trade_date - 22)].index, inplace=True)
+                # 通过中位数剔除毛刺数据
+                me = np.median(df['close'])
+                mad = np.median(abs(df['close'] - me))
+                up = me + (2*mad)
+                down = me - (2*mad)
+                df.drop(df[((df.close < down) | (df.close > up))].index, inplace=True)
+                close_df = pd.concat([close_df, df])
             num = len(close_df)
-            # 排除交易日小于 200 天的
-            if num < 200:
+            if num == 0:
                 continue
-            # 通过中位数剔除毛刺数据
-            me = np.median(close_df['close'])
-            mad = np.median(abs(close_df['close'] - me))
-            up = me + (2*mad)
-            down = me - (2*mad)
-            close_df.drop(close_df[((close_df.close < down) | (close_df.close > up))].index, inplace=True)
-            num = len(close_df)
+            
             close_df.sort_values(by='close', ascending=True, inplace=True)
             close_df.reset_index(drop=True, inplace=True)
             # 计算底部 10% 区间的价差阈值
