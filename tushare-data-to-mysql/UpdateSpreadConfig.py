@@ -2,8 +2,9 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-21
+# @Last Modified time: 2023-11-22
 
+import datetime
 import pandas as pd
 from sqlalchemy import create_engine
 import json
@@ -11,11 +12,30 @@ from DatabaseTools import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+# 从 postgre 中获取上一日所有合约组合的无风险价差
+def get_safe_spread():
+    today = datetime.date.today()
+    oneday = datetime.timedelta(days=1)
+    strDate = (today - oneday).strftime('%y-%m-%d')
+    engine = create_engine('postgresql://postgres:shan3353@10.10.20.188:5432/future?sslmode=disable')
+    safe_spread_df = pd.read_sql("SELECT ticker_n, ticker_f, product, safe_spread from future.safe_spread('{}', '{}')".format(strDate, strDate), con=engine)
+    spread_type_list = []
+    num = len(safe_spread_df)
+    for i in range(0, num):
+        spread_type = safe_spread_df.loc[i]['ticker_n'][-2:] + '-' + safe_spread_df.loc[i]['ticker_f'][-2:]
+        spread_type_list.append(spread_type)
+    safe_spread_df['spread_type'] = spread_type_list
+    return safe_spread_df
+
+# 更新价差配置文件
 def update_spread_config():
     f = open('./productOps.json', 'r')
     content = f.read()
     ops_json = json.loads(content)
     f.close()
+    
+    safe_spread_df = get_safe_spread()
+    
     engine_ts = creat_engine_with_database('futures')
     for i in range(0, len(ops_json)):
         fut_code = ops_json[i]['ProductID']
@@ -25,6 +45,7 @@ def update_spread_config():
         spread_type_df = read_data(engine_ts, sql)
         spread_type_list = []
         spread_price_list = []
+        safe_spread_list = []
         for j in range(0, len(spread_type_df)):
             spread_type = spread_type_df.loc[j]['spread_type']
             # spread_type = '03-05'
@@ -68,7 +89,14 @@ def update_spread_config():
                 rec_spread = round((low + (high - low) * 0.05), 1)
             else:
                 rec_spread = round((low + (high - low) * 0.1), 1)
-            
+                
+            df = safe_spread_df[(safe_spread_df['product'] == fut_code.upper()) & (safe_spread_df['spread_type'] == spread_type)]
+            safe_spread = -9999
+            if (len(df)):
+                df.reset_index(drop=True, inplace=True)
+                if not pd.isna(df.loc[0]['safe_spread']):
+                    safe_spread = round(df.loc[0]['safe_spread'], 2) * -1
+                
             # print(close_df)
             # print(rec_spread)
             # exit(1)
@@ -79,8 +107,10 @@ def update_spread_config():
             # exit(1)
             spread_type_list.append(spread_type_df.loc[j]['spread_type'])
             spread_price_list.append(rec_spread)
+            safe_spread_list.append(safe_spread)
         ops_json[i]['SpreadType'] = spread_type_list
         ops_json[i]['RecPrice'] = spread_price_list
+        ops_json[i]['SafeSpread'] = safe_spread_list
         print('{} 价差配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(ops_json) * 100, '.2f')))
     
     f = open('./productOps.json', 'w')
@@ -91,7 +121,6 @@ def update_spread_config():
 
 def main():
     update_spread_config()
-
 
 if __name__ == "__main__":
     main()
