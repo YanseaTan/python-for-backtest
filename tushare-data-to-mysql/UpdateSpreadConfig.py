@@ -16,10 +16,10 @@ def update_spread_config():
     content = f.read()
     ops_json = json.loads(content)
     f.close()
-
     engine_ts = creat_engine_with_database('futures')
     for i in range(0, len(ops_json)):
         fut_code = ops_json[i]['ProductID']
+        logout_month = ops_json[i]['WarrantsLogoutMonth']
         # fut_code = 'CJ'
         sql = "select distinct spread_type from fut_spread_daily where fut_code = '{}' order by spread_type".format(fut_code)
         spread_type_df = read_data(engine_ts, sql)
@@ -42,7 +42,7 @@ def update_spread_config():
                         break
                 # 去除交割前一个月的数据（如果未达到日期则不去除）
                 df.drop(df[df.index >= (num_of_trade_date - 22)].index, inplace=True)
-                # 通过中位数剔除毛刺数据
+                # 通过中位数剔除毛刺数据（当日成交量小于 1000 手则认为是毛刺）
                 me = np.median(df['close'])
                 mad = np.median(abs(df['close'] - me))
                 up = me + (2*mad)
@@ -55,10 +55,20 @@ def update_spread_config():
             
             close_df.sort_values(by='close', ascending=True, inplace=True)
             close_df.reset_index(drop=True, inplace=True)
-            # 计算底部 10% 区间的价差阈值
+            # 可转抛计算底部 10% 区间的价差阈值，不可转抛计算底部 5% 区间的价差阈值
             high = close_df.loc[num - 1]['close']
             low = close_df.loc[0]['close']
-            rec_spread = round((low + (high - low) * 0.1), 1)
+            ins1 = int(spread_type[:2])
+            ins2 = int(spread_type[3:])
+            sub_month = set()
+            while ins1 != ins2:
+                sub_month.add(ins1)
+                ins1 = (ins1 % 12) + 1
+            if len(sub_month & set(logout_month)):
+                rec_spread = round((low + (high - low) * 0.05), 1)
+            else:
+                rec_spread = round((low + (high - low) * 0.1), 1)
+            
             # print(close_df)
             # print(rec_spread)
             # exit(1)
