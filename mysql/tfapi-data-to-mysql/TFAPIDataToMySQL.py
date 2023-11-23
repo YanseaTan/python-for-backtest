@@ -71,7 +71,7 @@ def main():
     update_all_data()
     exit(1)
     
-    # data = fy_api.Get_Data('MEG港口库存')
+    # data = fy_api.Get_Data('山东基差主力合约')
     # print(data)
 
 
