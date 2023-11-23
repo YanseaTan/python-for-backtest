@@ -1,0 +1,250 @@
+[
+  {
+    "fut_code": "BU",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "沥青-华东炼厂库存量（万吨）"
+      },
+      {
+        "type": "inventory_rate",
+        "index_name": "沥青-全国社会库存率"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "沥青-市场价-山东"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "马瑞油产沥青综合利润（全税）"
+      },
+      {
+        "type": "operating_rate",
+        "index_name": "中国沥青日度开工负荷率"
+      }
+    ]
+  },
+  {
+    "fut_code": "MA",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "甲醇-港口库存"
+      },
+      {
+        "type": "inventory",
+        "index_name": "甲醇-港口可流通库存"
+      },
+      {
+        "type": "basis",
+        "index_name": "甲醇主力合约基差"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "甲醇（江苏低端）"
+      }
+    ]
+  },
+  {
+    "fut_code": "L",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "卓创库存-上游PE"
+      },
+      {
+        "type": "inventory",
+        "index_name": "PE周度港口库存"
+      },
+      {
+        "type": "inventory",
+        "index_name": "卓创库存-贸易商PE"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "LL交割品（华北）"
+      },
+      {
+        "type": "import_profits",
+        "index_name": "LLDPE进口利润"
+      }
+    ]
+  },
+  {
+    "fut_code": "PP",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "卓创库存-上游PP"
+      },
+      {
+        "type": "inventory",
+        "index_name": "卓创库存-贸易商PP"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "PP交割品（华北）"
+      }
+    ]
+  },
+  {
+    "fut_code": "V",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "华东PVC社会样本库存"
+      },
+      {
+        "type": "basis",
+        "index_name": "PVC电石法基差（华东）"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "电石法PVC华东市场价"
+      },
+      {
+        "type": "operating_rate",
+        "index_name": "PVC整体开工"
+      }
+    ]
+  },
+  {
+    "fut_code": "TA",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "中国PTA社会库存(千吨)"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "PTA-日内现货价格"
+      }
+    ]
+  },
+  {
+    "fut_code": "EG",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "MEG港口库存"
+      },
+      {
+        "type": "spot_price",
+        "index_name": "华东MEG"
+      }
+    ]
+  },
+  {
+    "fut_code": "SM",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "硅锰63家样本企业：库存"
+      },
+      {
+        "type": "basis",
+        "index_name": "硅锰01基差"
+      },
+      {
+        "type": "basis",
+        "index_name": "硅锰05基差"
+      },
+      {
+        "type": "operating_rate",
+        "index_name": "硅锰企业开工率（周）"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "内蒙：6517硅锰生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "宁夏：6517硅锰生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "广西：6517硅锰生产利润"
+      }
+    ]
+  },
+  {
+    "fut_code": "SF",
+    "index": [
+      {
+        "type": "inventory",
+        "index_name": "硅铁：60家样本企业：库存：中国（周）"
+      },
+      {
+        "type": "operating_rate",
+        "index_name": "硅铁生产企业：开工率（周）"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "内蒙：72硅铁生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "宁夏：72硅铁生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "陕西：72硅铁生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "青海：72硅铁生产利润"
+      }
+    ]
+  },
+  {
+    "fut_code": "SS",
+    "index": [
+      {
+        "type": "output",
+        "index_name": "产能产量-不锈钢产量-中国及印尼不锈钢产量-全国|按比例推算全国300系产量"
+      }
+    ]
+  },
+  {
+    "fut_code": "RB",
+    "index": [
+      {
+        "type": "output",
+        "index_name": "产量:粗钢:当月值"
+      },
+      {
+        "type": "output",
+        "index_name": "Mysteel日均铁水"
+      },
+      {
+        "type": "output",
+        "index_name": "Mysteel五大品种合计周产量"
+      },
+      {
+        "type": "operating_rate",
+        "index_name": "85家独立电弧炉钢厂：开工率：中国（周）"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "河北螺纹生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "江苏螺纹生产利润"
+      }
+    ]
+  },
+  {
+    "fut_code": "HC",
+    "index": [
+      {
+        "type": "production_profits",
+        "index_name": "上海热卷生产利润"
+      },
+      {
+        "type": "production_profits",
+        "index_name": "天津热卷生产利润"
+      }
+    ]
+  }
+]

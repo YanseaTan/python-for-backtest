@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-22
+# @Last Modified time: 2023-11-23
 
 import datetime
 import pandas as pd
@@ -29,7 +29,7 @@ def get_safe_spread():
 
 # 更新价差配置文件
 def update_spread_config():
-    f = open('./productOps.json', 'r')
+    f = open('./config/productOps.json', 'r')
     content = f.read()
     ops_json = json.loads(content)
     f.close()
@@ -113,7 +113,7 @@ def update_spread_config():
         ops_json[i]['SafeSpread'] = safe_spread_list
         print('{} 价差配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(ops_json) * 100, '.2f')))
     
-    f = open('./productOps.json', 'w')
+    f = open('./config/productOps.json', 'w')
     content = json.dumps(ops_json, indent=2)
     f.write(content)
     f.close()
