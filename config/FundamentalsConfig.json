@@ -3,27 +3,27 @@
     "fut_code": "BU",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "沥青-华东炼厂库存量（万吨）"
       },
       {
-        "type": "inventory_rate",
+        "index_type": "库存",
         "index_name": "沥青-全国社会库存率"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "山东基差主力合约"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "沥青-市场价-山东"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "马瑞油产沥青综合利润（全税）"
       },
       {
-        "type": "operating_rate",
+        "index_type": "开工率",
         "index_name": "中国沥青日度开工负荷率"
       }
     ]
@@ -32,19 +32,19 @@
     "fut_code": "MA",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "甲醇-港口库存"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "甲醇-港口可流通库存"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "甲醇主力合约基差"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "甲醇（江苏低端）"
       }
     ]
@@ -53,35 +53,35 @@
     "fut_code": "L",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "卓创库存-上游PE"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "PE周度港口库存"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "卓创库存-贸易商PE"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "LL01基差（华北）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "LL05基差（华北）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "LL09基差（华北）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "LL交割品（华北）"
       },
       {
-        "type": "import_profits",
+        "index_type": "进口利润",
         "index_name": "LLDPE进口利润"
       }
     ]
@@ -90,27 +90,27 @@
     "fut_code": "PP",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "卓创库存-上游PP"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "卓创库存-贸易商PP"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PP01基差（华北）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PP05基差（华北）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PP09基差（华北）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "PP交割品（华北）"
       }
     ]
@@ -119,23 +119,23 @@
     "fut_code": "V",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "社会库存合计"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "V风库存：上游"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PVC电石法基差（华东）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "电石法PVC华东市场价"
       },
       {
-        "type": "operating_rate",
+        "index_type": "开工率",
         "index_name": "PVC整体开工"
       }
     ]
@@ -144,39 +144,39 @@
     "fut_code": "TA",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "聚酯工厂（周）"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "PTA工厂（周）"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "仓单实物库存（周）"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "在库货（周）"
       },
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "信用仓单（周）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "PTA-日内现货价格"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PTA现货-01基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PTA现货-05基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "PTA现货-09基差"
       }
     ]
@@ -185,23 +185,23 @@
     "fut_code": "EG",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "MEG港口库存"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "华东MEG"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "乙二醇现货-01基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "乙二醇现货-05基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "乙二醇现货-09基差"
       }
     ]
@@ -210,79 +210,79 @@
     "fut_code": "SM",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "硅锰63家样本企业：库存"
       },
       {
-        "type": "inventory_days",
+        "index_type": "库存",
         "index_name": "硅锰：库存平均可用天数：中国（月）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅锰01基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅锰05基差"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅锰09基差"
       },
       {
-        "type": "purchase_volume",
+        "index_type": "采购量",
         "index_name": "硅锰钢厂采购量：6517：三明钢铁（月）"
       },
       {
-        "type": "operating_rate",
+        "index_type": "开工率",
         "index_name": "硅锰企业开工率（周）"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "内蒙：6517硅锰生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "宁夏：6517硅锰生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "广西：6517硅锰生产利润"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰产量：全国（月）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：内蒙古（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：宁夏（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：广西（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：贵州（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：云南（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：陕西（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅锰：日均产量：山西（周）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "硅锰钢厂采购价格：6517：三明钢铁（月）"
       }
     ]
@@ -291,71 +291,71 @@
     "fut_code": "SF",
     "index": [
       {
-        "type": "inventory",
+        "index_type": "库存",
         "index_name": "硅铁：60家样本企业：库存：中国（周）"
       },
       {
-        "type": "inventory_days",
+        "index_type": "库存",
         "index_name": "硅铁：库存平均可用天数：中国（月）"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅铁01基差-鄂尔多斯"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅铁05基差-鄂尔多斯"
       },
       {
-        "type": "basis",
+        "index_type": "基差",
         "index_name": "硅铁09基差-鄂尔多斯"
       },
       {
-        "type": "purchase_volume",
+        "index_type": "采购量",
         "index_name": "硅铁钢厂采购量：75B：三明钢铁（月）"
       },
       {
-        "type": "operating_rate",
+        "index_type": "开工率",
         "index_name": "硅铁生产企业：开工率（周）"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "内蒙：72硅铁生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "宁夏：72硅铁生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "陕西：72硅铁生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "青海：72硅铁生产利润"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅铁产量：全国（月）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅铁：日均产量：内蒙（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅铁：日均产量：宁夏（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅铁：日均产量：青海（周）"
       },
       {
-        "type": "production_volume",
+        "index_type": "产量",
         "index_name": "硅铁：日均产量：陕西（周）"
       },
       {
-        "type": "spot_price",
+        "index_type": "现货价格",
         "index_name": "硅铁钢厂采购价格：75B：三明钢铁（月）"
       }
     ]
@@ -364,7 +364,7 @@
     "fut_code": "SS",
     "index": [
       {
-        "type": "output",
+        "index_type": "产量",
         "index_name": "产能产量-不锈钢产量-中国及印尼不锈钢产量-全国|按比例推算全国300系产量"
       }
     ]
@@ -373,31 +373,31 @@
     "fut_code": "RB",
     "index": [
       {
-        "type": "output",
+        "index_type": "产量",
         "index_name": "产量:粗钢:当月值"
       },
       {
-        "type": "output",
+        "index_type": "产量",
         "index_name": "Mysteel日均铁水"
       },
       {
-        "type": "output",
+        "index_type": "产量",
         "index_name": "Mysteel五大品种合计周产量"
       },
       {
-        "type": "operating_rate",
+        "index_type": "开工率",
         "index_name": "85家独立电弧炉钢厂：开工率：中国（周）"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "河北螺纹生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "江苏螺纹生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "唐山钢坯生产利润"
       }
     ]
@@ -406,11 +406,11 @@
     "fut_code": "HC",
     "index": [
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "上海热卷生产利润"
       },
       {
-        "type": "production_profits",
+        "index_type": "生产利润",
         "index_name": "天津热卷生产利润"
       }
     ]

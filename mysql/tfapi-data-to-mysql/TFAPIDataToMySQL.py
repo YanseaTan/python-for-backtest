@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-11-16
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-23
+# @Last Modified time: 2023-11-24
 
 from FYAPI import FY_API
 import datetime
@@ -28,12 +28,12 @@ def get_index_info():
 # 获取指定数据类型在指定日期区间内的所有数据并存入数据库
 def get_data(fut_code, index_type, symbol, start_date = '', end_date = ''):
     data = fy_api.Get_Data(symbol, start_date, end_date)
-    data.insert(0, 'type', index_type)
+    data.insert(0, 'index_type', index_type)
     data.insert(0, 'fut_code', fut_code)
     for i in range(0, len(data)):
         data.iloc[i, 3] = data.iloc[i, 3][:10].replace('-', '')
         data.iloc[i, 4] = float(data.iloc[i, 4]) / 3.15
-    data.columns = ['fut_code', 'type', 'index_name', 'update_date', 'value']
+    data.columns = ['fut_code', 'index_type', 'index_name', 'update_date', 'value']
     # print(data)
     # exit(1)
     engine_ts = creat_engine_with_database('futures')
@@ -51,7 +51,7 @@ def update_all_data():
     for i in range(0, len(config_json)):
         fut_code = config_json[i]['fut_code']
         for j in range(0, len(config_json[i]['index'])):
-            index_type = config_json[i]['index'][j]['type']
+            index_type = config_json[i]['index'][j]['index_type']
             index_name = config_json[i]['index'][j]['index_name']
             sql = "select update_date from fut_funds where index_name = '{}' order by update_date desc limit 1;".format(index_name)
             last_update_date_df = read_data(engine_ts, sql)

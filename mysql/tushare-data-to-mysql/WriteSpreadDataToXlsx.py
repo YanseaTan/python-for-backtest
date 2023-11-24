@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-17
+# @Last Modified time: 2023-11-24
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -597,15 +597,16 @@ def write_all_spread_daily_to_xlsx():
     fut_df = read_data(engine_ts, sql)
     fut_list = fut_df['fut_code'].tolist()
     # fut_list = ['SF', 'SM', 'SP', 'SS', 'RB', 'RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
+    # fut_list = ['AL']
     for i in range(0, len(fut_list)):
         write_spread_daily_to_xlsx(fut_list[i])
 
 def main():
-    # write_all_spread_daily_to_xlsx()
+    write_all_spread_daily_to_xlsx()
     # write_spread_low_to_xlsx()
     
     # test()
-    test_dataclean()
+    # test_dataclean()
 
 
 if __name__ == "__main__":
