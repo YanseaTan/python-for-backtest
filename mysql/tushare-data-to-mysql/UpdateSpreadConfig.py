@@ -2,9 +2,10 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-23
+# @Last Modified time: 2023-11-27
 
 import datetime
+import tushare as ts
 import pandas as pd
 from sqlalchemy import create_engine
 import json
@@ -12,13 +13,18 @@ from DatabaseTools import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Tushare 账户 token
+token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
+
 # 从 postgre 中获取上一日所有合约组合的无风险价差
 def get_safe_spread():
     today = datetime.date.today()
-    oneday = datetime.timedelta(days=1)
-    strDate = (today - oneday).strftime('%y-%m-%d')
+    strToday = today.strftime('%Y%m%d')
+    last_trade_date_df = pro.trade_cal(**{"cal_date":strToday}, fields=["pretrade_date"])
+    last_trade_date = last_trade_date_df.loc[0]['pretrade_date']
+    last_trade_date = datetime.datetime.strptime(last_trade_date, '%Y%m%d').strftime('%Y-%m-%d')
     engine = create_engine('postgresql://postgres:shan3353@10.10.20.188:5432/future?sslmode=disable')
-    safe_spread_df = pd.read_sql("SELECT ticker_n, ticker_f, product, safe_spread from future.safe_spread('{}', '{}')".format(strDate, strDate), con=engine)
+    safe_spread_df = pd.read_sql("SELECT ticker_n, ticker_f, product, safe_spread from future.safe_spread('{}', '{}')".format(last_trade_date, last_trade_date), con=engine)
     spread_type_list = []
     num = len(safe_spread_df)
     for i in range(0, num):
@@ -123,4 +129,6 @@ def main():
     update_spread_config()
 
 if __name__ == "__main__":
+    # 登录 Tushare 接口
+    pro = ts.pro_api(token)
     main()
