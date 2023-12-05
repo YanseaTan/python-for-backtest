@@ -182,6 +182,19 @@
     ]
   },
   {
+    "fut_code": "PF",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "量化:短纤库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "短纤现货价格"
+      }
+    ]
+  },
+  {
     "fut_code": "EG",
     "index": [
       {

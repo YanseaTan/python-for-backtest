@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-11-16
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-24
+# @Last Modified time: 2023-12-05
 
 from FYAPI import FY_API
 import datetime
@@ -71,7 +71,7 @@ def main():
     update_all_data()
     exit(1)
     
-    # data = fy_api.Get_Data('山东基差主力合约')
+    # data = fy_api.Get_Data('量化:短纤库存')
     # print(data)
 
 

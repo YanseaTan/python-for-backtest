@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-04
+# @Last Modified time: 2023-12-05
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -776,19 +776,28 @@ def test_funds_multiyear(fut_code, index_name):
     end_date = '000000'
     price_dict = {}
     date_dict = {}
+    ts_code_df_dict = {}
     for i in range(0, len(main_ts_code_df)):
         ts_code = main_ts_code_df.loc[i]['ts_code']
         nearly_ts_code = min(nearly_ts_code, ts_code[:ts_code.index('-')])
         
         spread_type = main_ts_code_df.loc[i]['spread_type']
-        sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code limit {};".format(fut_code, spread_type, cnt_of_year)
+        sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code;".format(fut_code, spread_type)
         ts_code_df = read_data(engine_ts, sql)
+        if len(ts_code_df) < cnt_of_year:
+            cnt_of_year = len(ts_code_df)
+        # 只保留临近指定年份的合约组合
+        while len(ts_code_df) > cnt_of_year:
+            ts_code_df.drop([0], inplace=True)
+        # 重置序号，不然会报错
+        ts_code_df = ts_code_df.reset_index(drop=True)
+        ts_code_df_dict[spread_type] = ts_code_df
         
         # 获取多年同跨月类型合约组合交易日的并集（为了展示在一张散点图上），并获取分合约组合分交易日期的收盘价差字典
         date_set = set()
         comb_dict = {}
         start_year = {}
-        for j in range(0, cnt_of_year):
+        for j in range(0, len(ts_code_df)):
             ts_code = ts_code_df.loc[j]['ts_code']
             sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
             df = read_data(engine_ts, sql)
@@ -814,8 +823,7 @@ def test_funds_multiyear(fut_code, index_name):
     spread_data_dict = {}
     for i in range(0, len(main_ts_code_df)):
         spread_type = main_ts_code_df.loc[i]['spread_type']
-        sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code limit 4;".format(fut_code, spread_type)
-        ts_code_df = read_data(engine_ts, sql)
+        ts_code_df = ts_code_df_dict[spread_type]
         
         date_list = date_dict[spread_type]
         if start_date < date_list[0]:
@@ -905,8 +913,7 @@ def test_funds_multiyear(fut_code, index_name):
     for i in range(0, len(main_ts_code_df)):
         title.append('日期')
         spread_type = main_ts_code_df.loc[i]['spread_type']
-        sql = "select distinct ts_code from fut_spread_daily where fut_code = '{}' and spread_type = '{}' order by ts_code limit {};".format(fut_code, spread_type, cnt_of_year)
-        ts_code_df = read_data(engine_ts, sql)
+        ts_code_df = ts_code_df_dict[spread_type]
         for j in range(0, len(ts_code_df)):
             ts_code = ts_code_df.loc[j]['ts_code']
             ts_code = ts_code[ts_code.index('-') - 4:ts_code.index('-') - 2]
@@ -927,11 +934,11 @@ def test_funds_multiyear(fut_code, index_name):
         
     # 写入内容
     ws.range('A2').value = basis_list
-    chara = '>'
+    chara = chr(ord('C') - cnt_of_year - 1)
     for j in spread_data_dict.values():
-        chara = chr(ord(chara) + 5)
+        chara = chr(ord(chara) + cnt_of_year + 1)
         ws.range('{}2'.format(chara)).value = j
-    chara = chr(ord(chara) + 5)
+    chara = chr(ord(chara) + cnt_of_year + 1)
     ws.range('{}2'.format(chara)).value = inventory_list
     ws.autofit()
     
@@ -1179,8 +1186,12 @@ def main():
     # test('MA')
     # test_funds('MA')
     param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存']
-                  , ['SF', '硅铁：60家样本企业：库存：中国（周）']]
-    test_funds_multiyear('SF', '硅铁：60家样本企业：库存：中国（周）')
+                  , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存']]
+    for i in param_list:
+        test_funds_multiyear(i[0], i[1])
+        
+    # test_funds_multiyear('PF', '量化:短纤库存')
+    
     # test_dataclean()
 
 
