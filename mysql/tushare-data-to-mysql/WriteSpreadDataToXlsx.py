@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-05
+# @Last Modified time: 2023-12-08
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -777,6 +777,7 @@ def test_funds_multiyear(fut_code, index_name):
     price_dict = {}
     date_dict = {}
     ts_code_df_dict = {}
+    minClose_dict = {}
     for i in range(0, len(main_ts_code_df)):
         ts_code = main_ts_code_df.loc[i]['ts_code']
         nearly_ts_code = min(nearly_ts_code, ts_code[:ts_code.index('-')])
@@ -797,6 +798,7 @@ def test_funds_multiyear(fut_code, index_name):
         date_set = set()
         comb_dict = {}
         start_year = {}
+        minClose = 99999
         for j in range(0, len(ts_code_df)):
             ts_code = ts_code_df.loc[j]['ts_code']
             sql = "select trade_date, close from fut_spread_daily where ts_code = '{}' and close is not NULL order by trade_date;".format(ts_code)
@@ -812,12 +814,14 @@ def test_funds_multiyear(fut_code, index_name):
                 date_set.add(date)
                 start_date = min(start_date, date)
                 end_date = max(end_date, date)
+                minClose = min(minClose, df.loc[k]['close'])
                 close_dict[date] = df.loc[k]['close']
             comb_dict[ts_code] = close_dict
         
         price_dict[spread_type] = comb_dict
         date_list = sorted(date_set)
         date_dict[spread_type] = date_list
+        minClose_dict[i] = minClose
         
     # 将不同跨月类型的价差数据整理为多个二维表格
     spread_data_dict = {}
@@ -853,6 +857,7 @@ def test_funds_multiyear(fut_code, index_name):
     sql = "select trade_date, close from fut_daily where ts_code like %(tt)s and close is not NULL and trade_date >= '{}' and trade_date <= '{}' order by trade_date;".format(start_date_new, end_date_new)
     nearly_close_df = pd.read_sql_query(sql, engine_ts, params={'tt':nearly_ts_code_list})
     basis_dict = {}
+    minBasis = 99999
     start_date_new = start_date_new[:4] + '/' + start_date_new[4:6] + '/' + start_date_new[-2:]
     basis_dict[start_date_new] = ''
     for i in range(0, len(spot_price_df)):
@@ -864,6 +869,7 @@ def test_funds_multiyear(fut_code, index_name):
             close = close_df.loc[0]['close']
             date = date[:4] + '/' + date[4:6] + '/' + date[-2:]
             basis_dict[date] = spot_price - close
+            minBasis = min(minBasis, (spot_price - close))
     end_date_new = end_date_new[:4] + '/' + end_date_new[4:6] + '/' + end_date_new[-2:]
     if end_date_new not in basis_dict.keys():
         basis_dict[end_date_new] = ''
@@ -962,6 +968,7 @@ def test_funds_multiyear(fut_code, index_name):
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+    chart.api[1].Axes(2).CrossesAt = minBasis - 50
     chart.api[1].ChartStyle = 245       # 图表格式
     chart.api[1].ChartColor = 17        # 图表色系
     
@@ -987,6 +994,7 @@ def test_funds_multiyear(fut_code, index_name):
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
         chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+        chart.api[1].Axes(2).CrossesAt = minClose_dict[j] - 50
         chart.api[1].ChartStyle = 245       # 图表格式
     
     cnt_of_date = len(inventory_list)
@@ -1185,12 +1193,13 @@ def main():
     
     # test('MA')
     # test_funds('MA')
-    param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存']
-                  , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存']]
-    for i in param_list:
-        test_funds_multiyear(i[0], i[1])
+    # param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存']
+    #               , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存']]
+    # for i in param_list:
+    #     test_funds_multiyear(i[0], i[1])
+    # exit(1)
         
-    # test_funds_multiyear('PF', '量化:短纤库存')
+    test_funds_multiyear('MA', '甲醇-港口库存')
     
     # test_dataclean()
 

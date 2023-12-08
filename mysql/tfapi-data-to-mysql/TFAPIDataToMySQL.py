@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-11-16
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-05
+# @Last Modified time: 2023-12-07
 
 from FYAPI import FY_API
 import datetime
@@ -71,8 +71,8 @@ def main():
     update_all_data()
     exit(1)
     
-    # data = fy_api.Get_Data('量化:短纤库存')
-    # print(data)
+    data = fy_api.Get_Data('硅锰：6517：采购价格：河钢集团（月）')
+    print(data)
 
 
 if __name__ == "__main__":
