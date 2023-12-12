@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-08
+# @Last Modified time: 2023-12-12
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -171,6 +171,7 @@ def write_spread_daily_to_xlsx(fut_code):
         date_set = set()
         comb_dict = {}
         start_year = {}
+        minClose = 99999
         cnt_of_code = len(ts_code_df)
         for j in range(0, cnt_of_code):
             ts_code = ts_code_df.loc[j]['ts_code']
@@ -185,6 +186,7 @@ def write_spread_daily_to_xlsx(fut_code):
                     date = '30' + df.loc[k]['trade_date'][-4:]
                 date_set.add(date)
                 close_dict[date] = df.loc[k]['close']
+                minClose = min(minClose, df.loc[k]['close'])
             comb_dict[ts_code] = close_dict
         # 交易日并集小于 90 天的不纳入统计中
         if len(date_set) < 90:
@@ -259,6 +261,7 @@ def write_spread_daily_to_xlsx(fut_code):
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
         chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
         chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+        chart.api[1].Axes(2).CrossesAt = minClose - 50
         chart.api[1].ChartStyle = 245
         
         chart = ws.charts.add(530, 420, 650, 400)
@@ -893,6 +896,8 @@ def test_funds_multiyear(fut_code, index_name):
                 date = '24' + df.loc[k]['update_date'][-4:]
             else:
                 date = '23' + df.loc[k]['update_date'][-4:]
+            if date == '230229':
+                date = '230228'
             date_set.add(date)
             close_dict[date] = df.loc[k]['value']
         comb_dict[i] = close_dict
@@ -1181,9 +1186,9 @@ def write_all_spread_daily_to_xlsx():
     engine_ts = creat_engine_with_database('futures')
     sql = "select distinct fut_code from fut_basic order by fut_code desc;"
     fut_df = read_data(engine_ts, sql)
-    # fut_list = fut_df['fut_code'].tolist()
+    fut_list = fut_df['fut_code'].tolist()
     # fut_list = ['SF', 'SM', 'SP', 'SS', 'RB', 'RU', 'MA', 'SA', 'SR', 'M', 'TA', 'V', 'C', 'SN', 'NI', 'FU', 'HC', 'CF', 'RM', 'EG', 'BU']
-    fut_list = ['PP', 'SC']
+    # fut_list = ['CF', 'SP']
     for i in range(0, len(fut_list)):
         write_spread_daily_to_xlsx(fut_list[i])
 
@@ -1194,12 +1199,17 @@ def main():
     # test('MA')
     # test_funds('MA')
     # param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存']
-    #               , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存']]
-    # for i in param_list:
-    #     test_funds_multiyear(i[0], i[1])
-    # exit(1)
+    #               , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存'], ['SM', '硅锰63家样本企业：库存'], ['BU', '沥青-华东炼厂库存量（万吨）']]
+    param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存']
+                  , ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存'], ['SM', '硅锰63家样本企业：库存'], ['BU', '沥青-华东炼厂库存量（万吨）']
+                  , ['RM', '菜粕库存_中国'], ['M', '豆粕库存_中国'], ['HC', '库存:热卷(板)'], ['SR', '新增工业库存:食糖:全国'], ['C', '南港库存'], ['OI', '菜油库存_华东']
+                  , ['LC', '碳酸锂样本周度库存：冶炼厂'], ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国']
+                  , ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '库存-中国镍矿港口库存-中国镍矿港口库存合计-合计'], ['EB', '华东苯乙烯周度港口库存']]
+    for i in param_list:
+        test_funds_multiyear(i[0], i[1])
+    exit(1)
         
-    test_funds_multiyear('MA', '甲醇-港口库存')
+    # test_funds_multiyear('MA', '甲醇-港口库存')
     
     # test_dataclean()
 

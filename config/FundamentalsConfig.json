@@ -386,6 +386,14 @@
     "fut_code": "RB",
     "index": [
       {
+        "index_type": "库存",
+        "index_name": "Mysteel螺纹社会库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "螺纹钢最低交割价"
+      },
+      {
         "index_type": "产量",
         "index_name": "产量:粗钢:当月值"
       },
@@ -419,12 +427,202 @@
     "fut_code": "HC",
     "index": [
       {
+        "index_type": "库存",
+        "index_name": "库存:热卷(板)"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "热卷最低交割价"
+      },
+      {
         "index_type": "生产利润",
         "index_name": "上海热卷生产利润"
       },
       {
         "index_type": "生产利润",
         "index_name": "天津热卷生产利润"
+      }
+    ]
+  },
+  {
+    "fut_code": "RM",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "菜粕库存_中国"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "黄埔菜粕价格"
+      }
+    ]
+  },
+  {
+    "fut_code": "M",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "豆粕库存_中国"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "东莞豆粕价格"
+      }
+    ]
+  },
+  {
+    "fut_code": "SR",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "新增工业库存:食糖:全国"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "白糖南宁"
+      }
+    ]
+  },
+  {
+    "fut_code": "C",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "南港库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "大连玉米现货价"
+      }
+    ]
+  },
+  {
+    "fut_code": "OI",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "菜油库存_华东"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "江苏菜油价格"
+      }
+    ]
+  },
+  {
+    "fut_code": "LC",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "碳酸锂样本周度库存：冶炼厂"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "电池级碳酸锂 - 平均价"
+      }
+    ]
+  },
+  {
+    "fut_code": "FG",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "浮法玻璃生产线库存（万吨）"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "武汉玻璃价格"
+      }
+    ]
+  },
+  {
+    "fut_code": "SP",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "港口纸浆总库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "基准品价格：纸浆"
+      }
+    ]
+  },
+  {
+    "fut_code": "SC",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "国别库存-中国"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "Basrah Medium M1对应到岸价（CNY）"
+      }
+    ]
+  },
+  {
+    "fut_code": "CF",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "棉花：商业库存：中国（周）"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "中国棉花价格指数:3128B"
+      }
+    ]
+  },
+  {
+    "fut_code": "SN",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "中国分地区锡锭社会库存-总库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "价格-锡锭-SMM1#锡锭价格-平均价"
+      }
+    ]
+  },
+  {
+    "fut_code": "Y",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "豆油库存_中国"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "1级豆油价格_黄埔"
+      }
+    ]
+  },
+  {
+    "fut_code": "NI",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "库存-中国镍矿港口库存-中国镍矿港口库存合计-合计"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "长江有色:最低价(含税):镍:1#"
+      }
+    ]
+  },
+  {
+    "fut_code": "EB",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "华东苯乙烯周度港口库存"
+      },
+      {
+        "index_type": "现货价格",
+        "index_name": "苯乙烯：江苏出罐价"
       }
     ]
   }
