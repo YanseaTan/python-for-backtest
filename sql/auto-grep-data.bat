@@ -10,8 +10,9 @@ start python ./sql/tfapi-data-to-mysql/TFAPIDataToMySQL.py
 start python ./sql/tfapi-data-to-postgre/TFAPIDataToPostgre.py
 timeout /t 60 >nul &
 start python ./sql/tushare-data-to-mysql/FuturesMDToSpread.py
-timeout /t 600 >nul &
+timeout /t 240 >nul &
 start python ./sql/tushare-data-to-mysql/UpdateSpreadConfig.py
+timeout /t 600 >nul &
 start python ./sql/tushare-data-to-mysql/WriteFundsDataToXlsx.py
 
 exit
