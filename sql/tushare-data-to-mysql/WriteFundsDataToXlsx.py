@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-14
+# @Last Modified time: 2023-12-22
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -304,7 +304,7 @@ def write_all_funds_to_xlsx():
                   ['RM', '菜粕库存_中国'], ['M', '豆粕库存_中国'], ['HC', '库存:热卷(板)'], ['SR', '新增工业库存:食糖:全国'], ['C', '南港库存'], ['OI', '菜油库存_华东'],
                   ['LC', '碳酸锂样本周度库存：冶炼厂'], ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
                   ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '库存-中国镍矿港口库存-中国镍矿港口库存合计-合计'],
-                  ['EB', '华东苯乙烯周度港口库存']]
+                  ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
     param_dict = {}
     for i in param_list:
         param_dict[i[0]] = i[1]
