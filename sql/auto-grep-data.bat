@@ -12,7 +12,7 @@ timeout /t 60 >nul &
 start python ./sql/tushare-data-to-mysql/FuturesMDToSpread.py
 timeout /t 240 >nul &
 start python ./sql/tushare-data-to-mysql/UpdateSpreadConfig.py
-timeout /t 600 >nul &
-start python ./sql/tushare-data-to-mysql/WriteFundsDataToXlsx.py
+@REM timeout /t 600 >nul &
+@REM start python ./sql/tushare-data-to-mysql/WriteFundsDataToXlsx.py
 
 exit

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-27
+# @Last Modified time: 2024-01-03
 
 import datetime
 import tushare as ts
@@ -23,7 +23,7 @@ def get_safe_spread():
     last_trade_date_df = pro.trade_cal(**{"cal_date":strToday}, fields=["pretrade_date"])
     last_trade_date = last_trade_date_df.loc[0]['pretrade_date']
     last_trade_date = datetime.datetime.strptime(last_trade_date, '%Y%m%d').strftime('%Y-%m-%d')
-    engine = create_engine('postgresql://postgres:shan3353@10.10.20.188:5432/future?sslmode=disable')
+    engine = create_engine('postgresql://postgres:shan3353@10.10.20.189:5432/future?sslmode=disable')
     safe_spread_df = pd.read_sql("SELECT ticker_n, ticker_f, product, safe_spread from future.safe_spread('{}', '{}')".format(last_trade_date, last_trade_date), con=engine)
     spread_type_list = []
     num = len(safe_spread_df)
