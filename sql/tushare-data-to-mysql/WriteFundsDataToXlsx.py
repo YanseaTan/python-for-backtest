@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-12-22
+# @Last Modified time: 2024-01-10
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -115,8 +115,10 @@ def write_funds_to_xlsx(param_list):
             spread_data_dict[spread_type] = data_list
         
         # 获取历史现货价格和期货价格，手动计算基差
-        start_date_new = last_trade_date[:4] + start_date[-4:]
-        end_date_new = str(int(last_trade_date[:4]) + 1) + end_date[-4:]
+        # start_date_new = last_trade_date[:4] + start_date[-4:]
+        # end_date_new = str(int(last_trade_date[:4]) + 1) + end_date[-4:]
+        start_date_new = str(int(last_trade_date[:4]) - 1) + start_date[-4:]
+        end_date_new = last_trade_date[:4] + end_date[-4:]
         sql = "select update_date, value from fut_funds where fut_code = '{}' and index_type = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(fut_code, '现货价格', start_date_new, end_date_new)
         spot_price_df = read_data(engine_ts, sql)
         nearly_ts_code_list = [nearly_ts_code + '%']
@@ -147,8 +149,10 @@ def write_funds_to_xlsx(param_list):
         start_year = {}
         for i in range(0, cnt_of_year):
             add_year = int(end_date[:2]) - int(start_date[:2])
-            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1) + start_date[-4:]
-            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year + 1) + end_date[-4:]
+            # start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1) + start_date[-4:]
+            # end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year + 1) + end_date[-4:]
+            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i) + start_date[-4:]
+            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year) + end_date[-4:]
             sql = "select update_date, value from fut_funds where fut_code = '{}' and index_name = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(fut_code, index_name, start_date_new, end_date_new)
             df = read_data(engine_ts, sql)
             start_year[i] = df.loc[0]['update_date'][2:4]
