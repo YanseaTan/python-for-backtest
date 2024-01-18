@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-03
+# @Last Modified time: 2024-01-18
 
 import datetime
 import tushare as ts
@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Tushare 账户 token
-token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
+token = 'e59d203345b5dac84a150b2abb7b49dcb06b6c2abefa7bc49c06bea1'
 
 # 从 postgre 中获取上一日所有合约组合的无风险价差
 def get_safe_spread():

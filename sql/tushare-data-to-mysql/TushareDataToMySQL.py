@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2023-11-13
+# @Last Modified time: 2024-01-18
 
 import time
 import datetime
@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from DatabaseTools import *
 
 # Tushare 账户 token
-token = 'a526c0dd1419c44623d2257ad618848962a5ad988f36ced44ae33981'
+token = 'e59d203345b5dac84a150b2abb7b49dcb06b6c2abefa7bc49c06bea1'
 
 # 获取所有日行情数据库中缺少的交易日期合集
 def get_trade_date_set():
