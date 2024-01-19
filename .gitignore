@@ -168,3 +168,4 @@ trending-stock/收益率.xlsx
 *.xlsx
 output/
 .idea/
+.vscode/

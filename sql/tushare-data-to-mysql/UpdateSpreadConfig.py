@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-18
+# @Last Modified time: 2024-01-19
 
 import datetime
 import tushare as ts
@@ -119,7 +119,7 @@ def update_spread_config():
         ops_json[i]['SafeSpread'] = safe_spread_list
         print('{} 价差配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(ops_json) * 100, '.2f')))
     
-    f = open('./config/productOps.json', 'w')
+    f = open('./output/productOps.json', 'w')
     content = json.dumps(ops_json, indent=2)
     f.write(content)
     f.close()

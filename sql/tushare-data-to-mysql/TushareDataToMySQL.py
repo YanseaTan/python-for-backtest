@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-18
+# @Last Modified time: 2024-01-19
 
 import time
 import datetime
@@ -36,7 +36,7 @@ def get_trade_date_set():
     return trade_date_set
 
 # 获取所有股票基本信息
-def get_stock_basic_data():
+def get_all_stock_basic_data():
     engine_ts = creat_engine_with_database('stock')
     df = pro.stock_basic()
     write_data(engine_ts, 'stock_basic', df)
@@ -53,32 +53,14 @@ def update_stock_basic_data():
     print('更新所有股票基本信息成功！数据量:', len(df))
 
 # 获取所有可转债基本信息
-def get_cb_basic_data():
+def get_all_cb_basic_data():
     engine_ts = creat_engine_with_database('bond')
-    df = pro.cb_basic(fields=["ts_code","bond_short_name","stk_code","stk_short_name","maturity","par","issue_price","issue_size",
-                              "remain_size","value_date","maturity_date","coupon_rate","list_date","delist_date","exchange",
-                              "conv_start_date","conv_end_date","conv_stop_date","first_conv_price","conv_price","add_rate"])
-    write_data(engine_ts, 'cb_basic', df)
-    
-# 更新所有可转债基本信息
-def update_cb_basic_data():
-    engine_ts = creat_engine_with_database('bond')
-    sql = 'select distinct value_date from cb_basic order by value_date desc limit 1'
-    last_value_date_df = read_data(engine_ts, sql)
-    last_value_date = last_value_date_df.loc[0]['value_date'].strftime('%Y-%m-%d')
-    df = pro.cb_basic(fields=["ts_code","bond_short_name","stk_code","stk_short_name","maturity","par","issue_price","issue_size",
-                              "remain_size","value_date","maturity_date","coupon_rate","list_date","delist_date","exchange",
-                              "conv_start_date","conv_end_date","conv_stop_date","first_conv_price","conv_price","add_rate"])
-    drop_list = []
-    for i in range(0, len(df)):
-        if df.loc[i]['value_date'] == None or str(df.loc[i]['value_date']) <= last_value_date:
-            drop_list.append(i)
-    df.drop(drop_list, inplace=True)
-    write_data(engine_ts, 'cb_basic', df)
+    df = pro.cb_basic()
+    df.to_sql('cb_basic', engine_ts, index=False, if_exists='replace', chunksize=5000)
     print('更新所有可转债基本信息成功！数据量:', len(df))
     
 # 获取所有可转债的所有历史日行情数据
-def get_cb_daily_data():
+def get_all_cb_md_data():
     engine_ts = creat_engine_with_database('bond')
     sql = 'SELECT ts_code FROM cb_basic'
     ts_code = read_data(engine_ts, sql)
@@ -86,7 +68,9 @@ def get_cb_daily_data():
         # 若调用次数达到限制，则在一分钟内反复尝试
         for _ in range(60):
             try:
-                df = pro.cb_daily(**{'ts_code': ts_code.loc[i]['ts_code']})
+                df = pro.cb_daily(**{'ts_code': ts_code.loc[i]['ts_code']},
+                                  fields=["ts_code","trade_date","pre_close","open","high","low","close","change",
+                                          "pct_chg","vol","amount","bond_value","bond_over_rate","cb_value","cb_over_rate"])
                 if len(df):
                     write_data(engine_ts, 'cb_daily', df)
                 else:
@@ -95,16 +79,19 @@ def get_cb_daily_data():
                 time.sleep(1)
             else:
                 break
+        print("{} 日行情数据导入成功，总进度 {}%".format(ts_code.loc[i]['ts_code'], round((i + 1) / len(ts_code) * 100, 2)))
             
 # 获取指定交易日所有可转债的日行情数据
-def get_cb_md_data(trade_date = ''):
+def update_cb_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('bond')
-    df = pro.cb_daily(**{"trade_date": trade_date})
+    df = pro.cb_daily(**{"trade_date": trade_date},
+                      fields=["ts_code","trade_date","pre_close","open","high","low","close","change",
+                              "pct_chg","vol","amount","bond_value","bond_over_rate","cb_value","cb_over_rate"])
     write_data(engine_ts, 'cb_daily', df)
     print('新增可转债日行情 {} 条！'.format(len(df)))
 
 # 获取期货合约基本信息
-def get_fut_basic_data():
+def get_all_fut_basic_data():
     engine_ts = creat_engine_with_database('futures')
     futuresExchanges = ['CFFEX', 'DCE', 'CZCE', 'SHFE', 'INE', 'GFEX']
     for exchange in futuresExchanges:
@@ -128,7 +115,7 @@ def update_fut_basic_data():
         print('更新 {} 期货合约基本信息成功！数据量：{}'.format(exchange, len(df)))
 
 # 获取所有期货合约的所有历史日行情数据
-def get_fut_daily_data():
+def get_all_fut_md_data():
     engine_ts = creat_engine_with_database('futures')
     # 去除主力/连续合约
     sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is not NULL'
@@ -148,7 +135,7 @@ def get_fut_daily_data():
                 break
             
 # 获取指定交易日所有期货合约的日行情数据
-def get_fut_md_data(trade_date = ''):
+def update_fut_md_data(trade_date = ''):
     engine_ts = creat_engine_with_database('futures')
     # 去除主力/连续合约
     sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is NULL'
@@ -166,13 +153,13 @@ def get_fut_md_data(trade_date = ''):
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_data():
     update_stock_basic_data()
-    update_cb_basic_data()
+    get_all_cb_basic_data()
     update_fut_basic_data()
     
     trade_date_set = get_trade_date_set()
     for trade_date in trade_date_set:
-        get_cb_md_data(trade_date)
-        get_fut_md_data(trade_date)
+        update_cb_md_data(trade_date)
+        update_fut_md_data(trade_date)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口
