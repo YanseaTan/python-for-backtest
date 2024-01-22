@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-18
+# @Last Modified time: 2024-01-22
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -56,6 +56,7 @@ def write_funds_to_xlsx(param_list):
             # 只保留临近指定年份的合约组合
             while len(ts_code_df) > cnt_of_year:
                 ts_code_df.drop([0], inplace=True)
+                ts_code_df = ts_code_df.reset_index(drop=True)
             # 重置序号，不然会报错
             ts_code_df = ts_code_df.reset_index(drop=True)
             ts_code_df_dict[spread_type] = ts_code_df
@@ -334,6 +335,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         # 只保留临近指定年份的合约组合
         while len(ts_code_df) > cnt_of_year:
             ts_code_df.drop([0], inplace=True)
+            ts_code_df = ts_code_df.reset_index(drop=True)
         # 重置序号，不然会报错
         ts_code_df = ts_code_df.reset_index(drop=True)
         
@@ -488,6 +490,52 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
                 if date in inventory_dict[j]:
                     close_list[j + 1] = inventory_dict[j][date]
             inventory_list.append(close_list)
+            
+        # 获取仓单信息
+        date_set = set()
+        warehouse_dict = {}
+        start_year = {}
+        for i in range(0, cnt_of_year):
+            add_year = int(end_date[:2]) - int(start_date[:2])
+            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i) + start_date[-4:]
+            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year) + end_date[-4:]
+            sql = "select distinct trade_date, fut_name, unit from fut_warehouse where symbol = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date_new, end_date_new)
+            trade_date_df = read_data(engine_ts, sql)
+            start_year[i] = trade_date_df.loc[0]['trade_date'][2:4]
+            vol_dict = {}
+            for j in range(0, len(trade_date_df)):
+                if trade_date_df.loc[j]['trade_date'][2:4] > start_year[i]:
+                    date = '24' + trade_date_df.loc[j]['trade_date'][-4:]
+                else:
+                    date = '23' + trade_date_df.loc[j]['trade_date'][-4:]
+                if date == '230229':
+                    date = '230228'
+                date_set.add(date)
+                
+                trade_date = trade_date_df.loc[j]['trade_date']
+                sql = "select vol from fut_warehouse where symbol = '{}' and trade_date = '{}'".format(fut_code, trade_date)
+                vol_df = read_data(engine_ts, sql)
+                vol = 0
+                for k in range(0, len(vol_df)):
+                    vol += vol_df.loc[k]['vol']
+                vol_dict[date] = vol
+            warehouse_dict[i] = vol_dict
+        
+        date_list = sorted(date_set)
+        if start_date < date_list[0]:
+            date_list.insert(0, start_date)
+        if end_date > date_list[len(date_list) - 1]:
+            date_list.append(end_date)
+            
+        warehouse_list = []
+        for i in range(0, len(date_list)):
+            date = date_list[i]
+            date_str = '20' + date[:2] + '/' + date[2:4] + '/' + date[-2:]
+            close_list = [date_str] + [''] * cnt_of_year
+            for j in range(0, cnt_of_year):
+                if date in warehouse_dict[j]:
+                    close_list[j + 1] = warehouse_dict[j][date]
+            warehouse_list.append(close_list)
         
         # 标题行数组
         title = ['日期']
@@ -503,9 +551,13 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         title.append('日期')
         title.append("{}{}基差".format(fut_code, nearly_ts_code[-2:]))
         title.append('日期')
-        for i in range(0, cnt_of_year):
-            year = str(int(last_trade_date[2:4]) - cnt_of_year + i + 1)
+        for j in range(0, cnt_of_year):
+            year = str(int(last_trade_date[2:4]) - cnt_of_year + j + 1)
             title.append("{}年库存".format(year))
+        title.append('日期')
+        for j in range(0, cnt_of_year):
+            year = str(int(last_trade_date[2:4]) - cnt_of_year + j + 1)
+            title.append("{}年仓单".format(year))
         
         # 写入标题
         ws.range('A1').value = title
@@ -521,6 +573,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         ws.range('{}2'.format(chara)).value = basis_list
         chara = chr(ord(chara) + 2)
         ws.range('{}2'.format(chara)).value = inventory_list
+        chara = chr(ord(chara) + cnt_of_year + 1)
+        ws.range('{}2'.format(chara)).value = warehouse_list
         ws.autofit()
         
         # 插入图像
@@ -551,7 +605,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         # 一腿价格图
         cnt_of_date = len(first_list)
         chart = ws.charts.add(20, 410, 650, 400)
-        chart.set_source_data(ws.range((1,6),(cnt_of_date + 1,10)))
+        chart.set_source_data(ws.range((1,2 + cnt_of_year),(cnt_of_date + 1,2 + cnt_of_year * 2)))
         # Excel VBA 指令
         chart.chart_type = 'xy_scatter_lines_no_markers'
         chart.api[1].SetElement(2)          #显示标题
@@ -575,7 +629,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         # 基差图
         cnt_of_date = len(basis_list)
         chart = ws.charts.add(20, 800, 650, 400)
-        chart.set_source_data(ws.range((1,11),(cnt_of_date + 1,12)))
+        chart.set_source_data(ws.range((1,3 + cnt_of_year * 2),(cnt_of_date + 1,4 + cnt_of_year * 2)))
         # Excel VBA 指令
         chart.chart_type = 'xy_scatter_lines_no_markers'
         chart.api[1].SetElement(2)          #显示标题
@@ -600,7 +654,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         # 库存图
         cnt_of_date = len(inventory_list)
         chart = ws.charts.add(20, 1190, 650, 400)
-        chart.set_source_data(ws.range((1,13),(cnt_of_date + 1, 17)))
+        chart.set_source_data(ws.range((1,5 + cnt_of_year * 2),(cnt_of_date + 1, 5 + cnt_of_year * 3)))
         # Excel VBA 指令
         chart.chart_type = 'xy_scatter_lines_no_markers'
         chart.api[1].SetElement(2)          #显示标题
@@ -612,6 +666,28 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
         # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
         chart.api[1].ChartTitle.Text = index_name     #改变标题文本
+        # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+        chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
+        chart.api[1].Legend.Position = -4107    # 图例显示在下方
+        chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+        chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "m/d"      # 格式化横坐标显示
+        chart.api[1].ChartStyle = 245       # 图表格式
+        
+        # 仓单图
+        cnt_of_date = len(warehouse_list)
+        chart = ws.charts.add(20, 1580, 650, 400)
+        chart.set_source_data(ws.range((1,6 + cnt_of_year * 3),(cnt_of_date + 1, 6 + cnt_of_year * 4)))
+        # Excel VBA 指令
+        chart.chart_type = 'xy_scatter_lines_no_markers'
+        chart.api[1].SetElement(2)          #显示标题
+        chart.api[1].SetElement(101)        #显示图例
+        chart.api[1].SetElement(301)        #x轴标题
+        # chart.api[1].SetElement(311)      #y轴标题
+        chart.api[1].SetElement(305)        #y轴的网格线
+        # chart.api[1].SetElement(334)      #x轴的网格线
+        chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+        # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+        chart.api[1].ChartTitle.Text = "{}-仓单".format(trade_date_df.loc[0]['fut_name'])     #改变标题文本
         # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
         chart.api[1].Axes(1).MajorUnit = 30      # 横坐标单位值
         chart.api[1].Legend.Position = -4107    # 图例显示在下方
@@ -646,7 +722,13 @@ def write_all_funds_to_xlsx():
     write_funds_to_xlsx(param_list)
     
 def write_all_spread_funds_to_xlsx():
-    param_list = [['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
+    param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存'],
+                  ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存'], ['SM', '硅锰63家样本企业：库存'], ['BU', '沥青-华东炼厂库存量（万吨）'],
+                  ['RM', '菜粕库存_中国'], ['M', '豆粕库存_中国'], ['HC', '库存:热卷(板)'], ['SR', '新增工业库存:食糖:全国'], ['C', '南港库存'], ['OI', '菜油库存_华东'],
+                  ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
+                  ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '库存-中国镍矿港口库存-中国镍矿港口库存合计-合计'],
+                  ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
+    # param_list = [['MA', '甲醇-港口库存']]
     for i in param_list:
         write_spread_funds_to_xlsx(i[0], i[1])
 

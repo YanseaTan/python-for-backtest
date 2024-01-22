@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-19
+# @Last Modified time: 2024-01-22
 
 import time
 import datetime
@@ -88,7 +88,7 @@ def update_cb_md_data(trade_date = ''):
                       fields=["ts_code","trade_date","pre_close","open","high","low","close","change",
                               "pct_chg","vol","amount","bond_value","bond_over_rate","cb_value","cb_over_rate"])
     write_data(engine_ts, 'cb_daily', df)
-    print('新增可转债日行情 {} 条！'.format(len(df)))
+    print('新增 {} 可转债日行情 {} 条！'.format(trade_date, len(df)))
 
 # 获取期货合约基本信息
 def get_all_fut_basic_data():
@@ -148,7 +148,59 @@ def update_fut_md_data(trade_date = ''):
             del_index.append(i)
     df = df.drop(df.index[del_index])
     write_data(engine_ts, 'fut_daily', df)
-    print('新增期货日行情 {} 条！'.format(len(df)))
+    print('新增 {} 期货日行情 {} 条！'.format(trade_date, len(df)))
+    
+# 获取所有期货品种的所有历史仓单数据
+def get_all_fut_warehouse_data():
+    today = datetime.date.today()
+    dateStr = today.strftime('%Y%m%d')
+    date_df = pro.trade_cal(**{"start_date":"20200101","end_date":dateStr,"is_open":"1"}, fields=["cal_date"])
+    engine_ts = creat_engine_with_database('futures')
+    for i in range(0, len(date_df)):
+        dateStr = date_df.loc[i]['cal_date']
+        # 若调用次数达到限制，则在一分钟内反复尝试
+        for _ in range(60):
+            try:
+                warehouse_df = pro.fut_wsr(**{"trade_date":dateStr}, fields=["trade_date","symbol","fut_name","pre_vol","vol","vol_chg","unit","warehouse","exchange"])
+                if len(warehouse_df):
+                    write_data(engine_ts, 'fut_warehouse', warehouse_df)
+                else:
+                    print('回调数据为空！查询日期:', dateStr)
+            except:
+                time.sleep(1)
+            else:
+                break
+        print("交易日 {} 仓单数据导入成功！进度：{}%".format(dateStr, round((i + 1) / len(date_df) * 100, 2)))
+        
+# 获取指定交易日所有期货品种的仓单数据
+def update_fut_warehouse_data(trade_date = ''):
+    engine_ts = creat_engine_with_database('futures')
+    warehouse_df = pro.fut_wsr(**{"trade_date":trade_date}, fields=["trade_date","symbol","fut_name","pre_vol","vol","vol_chg","unit","warehouse","exchange"])
+    write_data(engine_ts, 'fut_warehouse', warehouse_df)
+    print('新增 {} 期货仓单数据 {} 条！'.format(trade_date, len(warehouse_df)))
+    
+# 获取所有期货品种的所有历史仓单汇总数据
+def get_all_fut_warehouse_data_sum():
+    today = datetime.date.today()
+    dateStr = today.strftime('%Y%m%d')
+    date_df = pro.trade_cal(**{"start_date":"20200101","end_date":dateStr,"is_open":"1"}, fields=["cal_date"])
+    engine_ts = creat_engine_with_database('futures')
+    for i in range(0, len(date_df)):
+        dateStr = date_df.loc[i]['cal_date']
+        # 若调用次数达到限制，则在一分钟内反复尝试
+        for _ in range(60):
+            try:
+                warehouse_df = pro.fut_wsr(**{"trade_date":dateStr}, fields=["trade_date","symbol","vol"])
+                if len(warehouse_df):
+                    warehouse_sum_df = pd.DataFrame()
+                    write_data(engine_ts, 'fut_warehouse', warehouse_df)
+                else:
+                    print('回调数据为空！查询日期:', dateStr)
+            except:
+                time.sleep(1)
+            else:
+                break
+        print("交易日 {} 仓单数据导入成功！进度：{}%".format(dateStr, round((i + 1) / len(date_df) * 100, 2)))
         
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_data():
@@ -160,6 +212,7 @@ def update_daily_data():
     for trade_date in trade_date_set:
         update_cb_md_data(trade_date)
         update_fut_md_data(trade_date)
+        update_fut_warehouse_data(trade_date)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口
