@@ -2,10 +2,11 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-22
+# @Last Modified time: 2024-01-23
 
 import time
 import datetime
+from numpy import NaN
 import pandas as pd
 import tushare as ts
 from sqlalchemy import create_engine
@@ -97,7 +98,8 @@ def get_all_fut_basic_data():
     for exchange in futuresExchanges:
         df = pro.fut_basic(**{"exchange": exchange}, fields=["symbol","exchange","ts_code","name","fut_code","trade_unit","per_unit","list_date","delist_date","d_month","last_ddate"])
         write_data(engine_ts, 'fut_basic', df)
-        
+
+# 更新期货合约基本信息
 def update_fut_basic_data():
     engine_ts = creat_engine_with_database('futures')
     sql = 'select distinct list_date from fut_basic order by list_date desc limit 1'
@@ -153,7 +155,8 @@ def update_fut_md_data(trade_date = ''):
 # 获取所有期货品种的所有历史仓单数据
 def get_all_fut_warehouse_data():
     today = datetime.date.today()
-    dateStr = today.strftime('%Y%m%d')
+    oneday = datetime.timedelta(days=1)
+    dateStr = (today - oneday).strftime('%Y%m%d')
     date_df = pro.trade_cal(**{"start_date":"20200101","end_date":dateStr,"is_open":"1"}, fields=["cal_date"])
     engine_ts = creat_engine_with_database('futures')
     for i in range(0, len(date_df)):
@@ -182,7 +185,8 @@ def update_fut_warehouse_data(trade_date = ''):
 # 获取所有期货品种的所有历史仓单汇总数据
 def get_all_fut_warehouse_data_sum():
     today = datetime.date.today()
-    dateStr = today.strftime('%Y%m%d')
+    oneday = datetime.timedelta(days=1)
+    dateStr = (today - oneday).strftime('%Y%m%d')
     date_df = pro.trade_cal(**{"start_date":"20200101","end_date":dateStr,"is_open":"1"}, fields=["cal_date"])
     engine_ts = creat_engine_with_database('futures')
     for i in range(0, len(date_df)):
@@ -192,15 +196,58 @@ def get_all_fut_warehouse_data_sum():
             try:
                 warehouse_df = pro.fut_wsr(**{"trade_date":dateStr}, fields=["trade_date","symbol","vol"])
                 if len(warehouse_df):
-                    warehouse_sum_df = pd.DataFrame()
-                    write_data(engine_ts, 'fut_warehouse', warehouse_df)
+                    vol_dict = {}
+                    for j in range(0, len(warehouse_df)):
+                        if warehouse_df.loc[j]['vol'] == NaN:
+                            print('NaN')
+                            continue
+                        key = warehouse_df.loc[j]['trade_date'] + warehouse_df.loc[j]['symbol']
+                        if key in vol_dict.keys():
+                            vol_dict[key] += warehouse_df.loc[j]['vol']
+                        else:
+                            vol_dict[key] = warehouse_df.loc[j]['vol']
+                    warehouse_sum_dict = {}
+                    warehouse_sum_dict['trade_date'] = []
+                    warehouse_sum_dict['symbol'] = []
+                    warehouse_sum_dict['vol'] = []
+                    for k, v in vol_dict.items():
+                        warehouse_sum_dict["trade_date"].append(k[:8])
+                        warehouse_sum_dict["symbol"].append(k[8:])
+                        warehouse_sum_dict["vol"].append(v)
+                    warehouse_sum_df = pd.DataFrame(warehouse_sum_dict)
+                    write_data(engine_ts, 'fut_warehouse_sum', warehouse_sum_df)
                 else:
                     print('回调数据为空！查询日期:', dateStr)
             except:
                 time.sleep(1)
             else:
                 break
-        print("交易日 {} 仓单数据导入成功！进度：{}%".format(dateStr, round((i + 1) / len(date_df) * 100, 2)))
+        print("交易日 {} 仓单汇总数据导入成功！进度：{}%".format(dateStr, round((i + 1) / len(date_df) * 100, 2)))
+        
+# 获取指定交易日所有期货品种的仓单汇总数据
+def update_fut_warehouse_data_sum(trade_date = ''):
+    engine_ts = creat_engine_with_database('futures')
+    warehouse_df = pro.fut_wsr(**{"trade_date":trade_date}, fields=["trade_date","symbol","vol"])
+    vol_dict = {}
+    for j in range(0, len(warehouse_df)):
+        if warehouse_df.loc[j]['vol'] == NaN:
+            continue
+        key = warehouse_df.loc[j]['trade_date'] + warehouse_df.loc[j]['symbol']
+        if key in vol_dict.keys():
+            vol_dict[key] += warehouse_df.loc[j]['vol']
+        else:
+            vol_dict[key] = warehouse_df.loc[j]['vol']
+    warehouse_sum_dict = {}
+    warehouse_sum_dict['trade_date'] = []
+    warehouse_sum_dict['symbol'] = []
+    warehouse_sum_dict['vol'] = []
+    for k, v in vol_dict.items():
+        warehouse_sum_dict["trade_date"].append(k[:8])
+        warehouse_sum_dict["symbol"].append(k[8:])
+        warehouse_sum_dict["vol"].append(v)
+    warehouse_sum_df = pd.DataFrame(warehouse_sum_dict)
+    write_data(engine_ts, 'fut_warehouse_sum', warehouse_sum_df)
+    print('新增 {} 期货仓单汇总数据 {} 条！'.format(trade_date, len(warehouse_sum_df)))
         
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_data():
@@ -213,6 +260,7 @@ def update_daily_data():
         update_cb_md_data(trade_date)
         update_fut_md_data(trade_date)
         update_fut_warehouse_data(trade_date)
+        update_fut_warehouse_data_sum(trade_date)
 
 if __name__ == '__main__':
     # 登录 Tushare 接口
