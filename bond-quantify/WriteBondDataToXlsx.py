@@ -2,8 +2,9 @@
 # @Author: Yansea
 # @Date:   2024-01-19
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-25
+# @Last Modified time: 2024-01-26
 
+from re import sub
 from sqlalchemy import create_engine
 import xlwings as xw
 import datetime
@@ -16,7 +17,7 @@ def get_max_drawdown_sys(array):
     cumsum = array.cummax()
     return max(cumsum-array)
 
-def write_bond_data_to_xlsx():
+def write_bond_fut_data_to_xlsx():
     app = xw.App(visible=True,add_book=False)
     wb = app.books.add()
     
@@ -51,7 +52,7 @@ def write_bond_data_to_xlsx():
     fut_multiplier = 200
     
     # 对冲参数
-    hedge_rate_list = [0.5, 1, 2, 4]
+    hedge_rate_list = [1, 2, 4, 10]
     
     # 获取纯转债多头净值数据
     result_list = [['对冲比例', '最大回撤', '最终收益', '风险收益比']]
@@ -231,8 +232,163 @@ def write_bond_data_to_xlsx():
     app.quit()
     print('转债-股指期货对冲净值回测 Excel 导出完毕！')
     
+def write_bond_data_to_xlsx():
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.add()
+    
+    start_date = '20210104'
+    today = datetime.date.today()
+    end_date = today.strftime('%Y%m%d')
+    file_name = '486只转债轮动'
+    
+    # 转债基础信息
+    init_fund = 10000000
+    
+    # 读取吾股排名 excel 文件，获取转债列表
+    app2 = xw.App(visible = True, add_book = False)
+    app2.display_alerts = False
+    app2.screen_updating = False
+    workbook = app2.books.open('./bond-quantify/吾股排名.xlsx')
+    worksheet = workbook.sheets.active
+    rng = worksheet.range("A2").expand("table")
+    nRows = rng.rows.count
+    code_list = []
+    for i in range(2, nRows + 2):
+        codeStr = str(worksheet.range("A" + str(i)).value)
+        if codeStr[:2] == '11':
+            codeStr = codeStr[:6] + '.SH'
+        else:
+            codeStr = codeStr[:6] + '.SZ'
+        code_list.append(codeStr)
+    workbook.close()
+    app2.quit()
+    
+    # 每 100 个为一组进行回测
+    sub_code_list = []
+    engine_ts = creat_engine_with_database('bond')
+    for i in range(0, len(code_list)):
+        sub_code_list.append(code_list[i])
+        if len(sub_code_list) > 99 or i == (len(code_list) - 1):
+            close_dict = {}
+            ipo_date_dict = {}
+            resub_code_list = []
+            for j in range(0, len(sub_code_list)):
+                sql = "select trade_date, close from cb_daily where ts_code = '{}' order by trade_date".format(sub_code_list[j])
+                close_df = read_data(engine_ts, sql)
+                if close_df.loc[0]['close'] > 120:
+                    resub_code_list.append(sub_code_list[j])
+                    continue
+                trade_date_list = close_df['trade_date'].values.tolist()
+                close_list = close_df['close'].values.tolist()
+                close_dict[sub_code_list[j]] = dict(zip(trade_date_list, close_list))
+                ipo_date = close_df.loc[0]['trade_date']
+                if ipo_date > start_date:
+                    if ipo_date in ipo_date_dict.keys():
+                        ipo_date_dict[ipo_date].append(sub_code_list[j])
+                    else:
+                        ipo_date_dict[ipo_date] = [sub_code_list[j]]
+                    resub_code_list.append(sub_code_list[j])
+            sub_code_list = list(set(sub_code_list) - set(resub_code_list))
+            
+            sql = "select trade_date from cb_daily where ts_code = '{}' and trade_date >= '{}' order by trade_date".format(sub_code_list[0], start_date)
+            trade_date_df = read_data(engine_ts, sql)
+            trade_date_list = trade_date_df['trade_date'].values.tolist()
+            result_list = [['对冲比例', '最大回撤', '最终收益', '风险收益比']]
+            mini_worth = 1
+            per_fund = init_fund / len(sub_code_list)
+            remain_fund = init_fund
+            fund_dict = {}
+            fund_dict[start_date] = init_fund
+            for j in range(1, len(trade_date_list)):
+                num_list = []
+                trade_date = trade_date_list[j]
+                for k in range(0, len(sub_code_list)):
+                    close = close_dict[sub_code_list[k]][trade_date_list[j - 1]]
+                    num = int(per_fund / close)
+                    num_list.append(num)
+                    remain_fund -= num * close
+                for k in range(0, len(sub_code_list)):
+                    close = close_dict[sub_code_list[k]][trade_date]
+                    remain_fund += num_list[k] * close
+                fund_dict[trade_date] = remain_fund
+                if trade_date in ipo_date_dict.keys():
+                    sub_code_list += ipo_date_dict[trade_date]
+            
+            worth_list = [v / init_fund for v in fund_dict.values()]
+            for j in range(0, len(worth_list)):
+                trade_date = trade_date_list[j]
+                trade_date_list[j] = trade_date[:4] + '/' + trade_date[4:6] + '/' + trade_date[6:]
+                worth = worth_list[j]
+                worth_list[j] = round(worth, 4)
+                mini_worth = min(mini_worth, worth)
+            trade_date_list.insert(0, '日期')
+            worth_list.insert(0, '转债多头净值')
+            
+            one_result_list = ['转债多头']
+            max_drawdown = round(get_max_drawdown_sys(worth_list[1:]) * 100, 2)
+            one_result_list.append(str(max_drawdown) + '%')
+            profit = round((worth - 1) * 100, 2)
+            one_result_list.append(str(profit) + '%')
+            risk_rate = round(profit / max_drawdown, 1)
+            if risk_rate > 0:
+                one_result_list.append('1-' + str(risk_rate))
+            else:
+                one_result_list.append('/')
+            result_list.append(one_result_list)
+            
+            # 写入内容
+            ws = wb.sheets.add()
+            ws.range('A1').options(transpose=True).value = trade_date_list
+            ws.range('B1').options(transpose=True).value = worth_list
+            ws.range('D1').value = result_list
+            rng = ws.range('A1').expand()
+            for j in range(0, 2):
+                rng.columns[j][0].color = (211, 211, 211)
+            rng = ws.range('D1').expand()
+            for j in range(0, 4):
+                rng.columns[j][0].color = (200, 255, 200)
+            ws.autofit()
+            
+            # 插入曲线
+            # 转债多头净值曲线
+            cnt_of_date = len(worth_list)
+            chart = ws.charts.add(20, 200, 650, 400)
+            chart.set_source_data(ws.range((1,1),(cnt_of_date,2)))
+            # Excel VBA 指令
+            chart.chart_type = 'xy_scatter_lines_no_markers'
+            chart.api[1].SetElement(2)          #显示标题
+            chart.api[1].SetElement(101)        #显示图例
+            chart.api[1].SetElement(301)        #x轴标题
+            # chart.api[1].SetElement(311)      #y轴标题
+            chart.api[1].SetElement(305)        #y轴的网格线
+            # chart.api[1].SetElement(334)      #x轴的网格线
+            chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+            # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+            chart.api[1].ChartTitle.Text = "转债多头净值曲线"     #改变标题文本
+            # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+            chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
+            chart.api[1].Axes(2).MajorUnit = 0.02      # 纵坐标单位值
+            chart.api[1].Axes(1).MajorUnit = 150      # 横坐标单位值
+            chart.api[1].Legend.Position = -4107    # 图例显示在下方
+            # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+            chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
+            chart.api[1].Axes(2).CrossesAt = mini_worth - 0.02
+            chart.api[1].Axes(2).MinimumScale = mini_worth - 0.02
+            chart.api[1].ChartStyle = 245       # 图表格式
+            
+            sub_code_list = []
+    
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    if not os.path.exists('output/{}/'.format(todayStr)):
+        os.makedirs('output/{}/'.format(todayStr))
+    wb.save('./output/{}/{}-{}-{}净值回测.xlsx'.format(todayStr, start_date, end_date, file_name))
+    wb.close()
+    app.quit()
+    print('转债净值回测 Excel 导出完毕！')
 
 def main():
+    # write_bond_fut_data_to_xlsx()
     write_bond_data_to_xlsx()
 
 
