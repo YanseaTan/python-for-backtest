@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-01-19
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-24
+# @Last Modified time: 2024-01-25
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -20,8 +20,11 @@ def write_bond_data_to_xlsx():
     app = xw.App(visible=True,add_book=False)
     wb = app.books.add()
     
-    start_date = '20220406'
-    file_name = '76只转债综合'
+    start_date = '20190101'
+    today = datetime.date.today()
+    end_date = today.strftime('%Y%m%d')
+    end_date = '20190419'
+    file_name = '113只转债综合'
     
     # 转债基础信息
     init_fund = 10000000
@@ -59,7 +62,7 @@ def write_bond_data_to_xlsx():
     fund_dict[start_date] = init_fund
     engine_ts = creat_engine_with_database('bond')
     for code in code_list:
-        sql = "select close, trade_date from cb_daily where ts_code = '{}' and trade_date >= '{}' order by trade_date".format(code, start_date)
+        sql = "select close, trade_date from cb_daily where ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(code, start_date, end_date)
         close_df = read_data(engine_ts, sql)
         init_close = close_df.loc[0]['close']
         vol = int(per_fund / init_close)
@@ -99,7 +102,7 @@ def write_bond_data_to_xlsx():
     fut_fund_dict = {}
     fut_worth_list = [1]
     engine_ts = creat_engine_with_database('futures')
-    sql = "select trade_date, close from fut_daily where ts_code = '{}' and trade_date >= '{}' order by trade_date".format(fut_code, start_date)
+    sql = "select trade_date, close from fut_daily where ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date, end_date)
     fut_close_df = read_data(engine_ts, sql)
     init_close = fut_close_df.loc[0]['close']
     fut_fund_dict[start_date] = init_close
@@ -125,6 +128,7 @@ def write_bond_data_to_xlsx():
     result_list.append(one_result_list)
         
     # 计算不同比例对冲的净值数据
+    mini_hedge_worth = 1
     hedge_worth_list = []
     for rate in hedge_rate_list:
         one_result_list = ['1-{}'.format(round(1 / rate, 2))]
@@ -134,6 +138,7 @@ def write_bond_data_to_xlsx():
         for trade_date in fund_dict.keys():
             hedge_worth = round((fund_dict[trade_date] + (fut_fund_dict[trade_date] * fut_vol * fut_multiplier)) / hedge_init_fund, 4)
             one_hedge_worth_list.append(hedge_worth)
+            mini_hedge_worth = min(mini_hedge_worth, hedge_worth)
         max_drawdown = round(get_max_drawdown_sys(one_hedge_worth_list[1:]) * 100, 2)
         one_result_list.append(str(max_drawdown) + '%')
         profit = round((hedge_worth - 1) * 100, 2)
@@ -213,15 +218,15 @@ def write_bond_data_to_xlsx():
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
-    chart.api[1].Axes(2).CrossesAt = mini_worth - 0.01
-    chart.api[1].Axes(2).MinimumScale = mini_worth - 0.01
+    chart.api[1].Axes(2).CrossesAt = mini_hedge_worth - 0.02
+    chart.api[1].Axes(2).MinimumScale = mini_hedge_worth - 0.02
     chart.api[1].ChartStyle = 245       # 图表格式
     
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
     if not os.path.exists('output/{}/'.format(todayStr)):
         os.makedirs('output/{}/'.format(todayStr))
-    wb.save('./output/{}/{}-{}-{}股指期货对冲净值回测.xlsx'.format(todayStr, start_date, file_name, fut_name))
+    wb.save('./output/{}/{}-{}-{}-{}股指期货对冲净值回测.xlsx'.format(todayStr, start_date, end_date, file_name, fut_name))
     wb.close()
     app.quit()
     print('转债-股指期货对冲净值回测 Excel 导出完毕！')

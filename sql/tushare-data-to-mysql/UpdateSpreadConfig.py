@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-19
+# @Last Modified time: 2024-01-25
 
 import datetime
 import tushare as ts
@@ -97,7 +97,7 @@ def update_spread_config():
                 rec_spread = round((low + (high - low) * 0.1), 1)
                 
             df = safe_spread_df[(safe_spread_df['product'] == fut_code.upper()) & (safe_spread_df['spread_type'] == spread_type)]
-            safe_spread = -9999
+            safe_spread = -999
             if (len(df)):
                 df.reset_index(drop=True, inplace=True)
                 if not pd.isna(df.loc[0]['safe_spread']):

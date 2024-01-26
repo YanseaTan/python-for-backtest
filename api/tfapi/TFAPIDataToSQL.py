@@ -9,9 +9,8 @@ import datetime
 import os
 import json
 import pandas as pd
-from sqlalchemy import create_engine
 import matplotlib.pyplot as plt
-from tools.DatabaseTools import *
+from DatabaseTools import *
 
 # 初始化天风 api
 h5_file_dir = "../output/tfapi/" #您自定义即可，但目录必须存在
@@ -36,6 +35,8 @@ def get_data(fut_code, index_type, symbol, start_date = '', end_date = ''):
     data.columns = ['fut_code', 'index_type', 'index_name', 'update_date', 'value']
     engine_ts = creat_mysql_engine('futures')
     write_data(engine_ts, 'fut_funds', 'futures', data)
+    engine_ts = creat_postgre_engine('future')
+    write_data(engine_ts, 'fut_funds', 'future', data)
     print('{} 写入成功！数据量：{}'.format(symbol, len(data)))
 
 # 更新所有配置文件中的基本面数据至数据库中，并只更新还未更新的日期的数据
@@ -121,6 +122,8 @@ def merge_data(index_name_list, new_index_name):
     
     new_df = pd.DataFrame(index_dict)
     write_data(engine_ts, 'fut_funds', 'futures', new_df)
+    engine_ts = creat_postgre_engine('future')
+    write_data(engine_ts, 'fut_funds', 'future', new_df)
     print("{}-{}数据合并生成完毕，已录入数据库！数据量：{}".format(fut_code, new_index_name, len(index_dict['update_date'])))
 
 def main():

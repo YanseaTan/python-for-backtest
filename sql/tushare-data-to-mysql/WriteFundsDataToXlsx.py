@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-24
+# @Last Modified time: 2024-01-25
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -501,18 +501,19 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
             end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year) + end_date[-4:]
             sql = "select trade_date, vol from fut_warehouse_sum where symbol = '{}' and vol is not NULL and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date_new, end_date_new)
             vol_df = read_data(engine_ts, sql)
-            start_year[i] = vol_df.loc[0]['trade_date'][2:4]
-            vol_dict = {}
-            for j in range(0, len(vol_df)):
-                if vol_df.loc[j]['trade_date'][2:4] > start_year[i]:
-                    date = '24' + vol_df.loc[j]['trade_date'][-4:]
-                else:
-                    date = '23' + vol_df.loc[j]['trade_date'][-4:]
-                if date == '230229':
-                    date = '230228'
-                date_set.add(date)
-                vol_dict[date] = vol_df.loc[j]['vol']
-            warehouse_dict[i] = vol_dict
+            if len(vol_df):
+                start_year[i] = vol_df.loc[0]['trade_date'][2:4]
+                vol_dict = {}
+                for j in range(0, len(vol_df)):
+                    if vol_df.loc[j]['trade_date'][2:4] > start_year[i]:
+                        date = '24' + vol_df.loc[j]['trade_date'][-4:]
+                    else:
+                        date = '23' + vol_df.loc[j]['trade_date'][-4:]
+                    if date == '230229':
+                        date = '230228'
+                    date_set.add(date)
+                    vol_dict[date] = vol_df.loc[j]['vol']
+                warehouse_dict[i] = vol_dict
         
         date_list = sorted(date_set)
         if start_date < date_list[0]:
@@ -526,8 +527,9 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
             date_str = '20' + date[:2] + '/' + date[2:4] + '/' + date[-2:]
             close_list = [date_str] + [''] * cnt_of_year
             for j in range(0, cnt_of_year):
-                if date in warehouse_dict[j]:
-                    close_list[j + 1] = warehouse_dict[j][date]
+                if j in warehouse_dict.keys():
+                    if date in warehouse_dict[j]:
+                        close_list[j + 1] = warehouse_dict[j][date]
             warehouse_list.append(close_list)
         
         # 标题行数组
@@ -706,7 +708,7 @@ def write_all_funds_to_xlsx():
                   ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存'], ['SM', '硅锰63家样本企业：库存'], ['BU', '沥青-华东炼厂库存量（万吨）'],
                   ['RM', '菜粕库存_中国'], ['M', '豆粕库存_中国'], ['HC', '库存:热卷(板)'], ['SR', '新增工业库存:食糖:全国'], ['C', '南港库存'], ['OI', '菜油库存_华东'],
                   ['LC', '碳酸锂样本周度库存：冶炼厂'], ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
-                  ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '库存-中国镍矿港口库存-中国镍矿港口库存合计-合计'],
+                  ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '电解镍国内社会库存（吨）'],
                   ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
     param_dict = {}
     for i in param_list:
@@ -715,13 +717,13 @@ def write_all_funds_to_xlsx():
     write_funds_to_xlsx(param_list)
     
 def write_all_spread_funds_to_xlsx():
-    param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['EG', 'MEG港口库存'],
+    param_list = [['MA', '甲醇-港口库存'], ['L', '卓创库存-上游PE'], ['PP', '卓创库存-上游PP'], ['V', '社会库存合计'], ['TA', 'PTA工厂（周）'], ['EG', 'MEG港口库存'],
                   ['SF', '硅铁：60家样本企业：库存：中国（周）'], ['PF', '量化:短纤库存'], ['SM', '硅锰63家样本企业：库存'], ['BU', '沥青-华东炼厂库存量（万吨）'],
                   ['RM', '菜粕库存_中国'], ['M', '豆粕库存_中国'], ['HC', '库存:热卷(板)'], ['SR', '新增工业库存:食糖:全国'], ['C', '南港库存'], ['OI', '菜油库存_华东'],
                   ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
-                  ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '库存-中国镍矿港口库存-中国镍矿港口库存合计-合计'],
+                  ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '电解镍国内社会库存（吨）'],
                   ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
-    # param_list = [['MA', '甲醇-港口库存']]
+    # param_list = [['NI', '电解镍国内社会库存（吨）']]
     for i in param_list:
         write_spread_funds_to_xlsx(i[0], i[1])
 
