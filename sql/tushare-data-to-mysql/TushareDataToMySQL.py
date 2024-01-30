@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-25
+# @Last Modified time: 2024-01-30
 
 import time
 import datetime
@@ -271,3 +271,6 @@ if __name__ == '__main__':
     # df = pro.fut_daily(**{'ts_code': 'IH.CFX', 'end_date': '20200101'})
     # engine_ts = creat_engine_with_database('futures')
     # write_data(engine_ts, 'fut_daily', df)
+    
+    # df = pro.trade_cal(**{"start_date": "20181228", "end_date": "20210201", "is_open": "1"}, fields=["cal_date"])
+    # print(df["cal_date"].tolist())

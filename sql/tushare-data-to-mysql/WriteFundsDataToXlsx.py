@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-25
+# @Last Modified time: 2024-01-29
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -576,7 +576,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         # 月差图
         cnt_of_date = len(data_list)
         chart = ws.charts.add(20, 20, 650, 400)
-        chart.set_source_data(ws.range((1,1),(cnt_of_date + 1,5)))
+        chart.set_source_data(ws.range((1,1),(cnt_of_date + 1, 1 + cnt_of_year)))
         # Excel VBA 指令
         chart.chart_type = 'xy_scatter_lines_no_markers'
         chart.api[1].SetElement(2)          #显示标题
@@ -723,7 +723,7 @@ def write_all_spread_funds_to_xlsx():
                   ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
                   ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '电解镍国内社会库存（吨）'],
                   ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
-    # param_list = [['NI', '电解镍国内社会库存（吨）']]
+    # param_list = [['PF', '量化:短纤库存']]
     for i in param_list:
         write_spread_funds_to_xlsx(i[0], i[1])
 
