@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-26
+# @Last Modified time: 2024-02-01
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -27,10 +27,17 @@ def read_data(database, sql):
     df = pd.read_sql_query(sql, engine_ts)
     return df
 
+def read_postgre_data(sql):
+    df = pd.read_sql_query(sql, postgre_engine_ts)
+    return df
+
 # 将指定内容写入指定数据库的指定表格中
 def write_data(tableName, schemaName, df):
     engine_ts = create_engine('mysql://{}:{}@/{}?charset=utf8&use_unicode=1'.format(mysql_user, mysql_password, schemaName))
-    df.to_sql(tableName, engine_ts, schemaName, index=False, if_exists='append', chunksize=5000)
+    try:
+        df.to_sql(tableName, engine_ts, schemaName, index=False, if_exists='append', chunksize=5000)
+    except:
+        print('写入本地数据库失败！')
     try:
         if schemaName == 'futures':
             schemaName = 'future'

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-26
+# @Last Modified time: 2024-02-01
 
 import time
 import datetime
@@ -19,8 +19,8 @@ token = 'e59d203345b5dac84a150b2abb7b49dcb06b6c2abefa7bc49c06bea1'
 
 # 获取所有日行情数据库中缺少的交易日期合集
 def get_trade_date_set():
-    sql = 'select distinct trade_date from cb_daily order by trade_date desc limit 1'
-    last_trade_date_df = read_data('bond', sql)
+    sql = 'select distinct trade_date from bond.cb_daily order by trade_date desc limit 1'
+    last_trade_date_df = read_postgre_data(sql)
     last_trade_date = last_trade_date_df.loc[0]['trade_date']
     today = datetime.date.today()
     oneday = datetime.timedelta(days=1)
@@ -44,8 +44,8 @@ def get_all_stock_basic_data():
     
 # 更新所有股票基本信息
 def update_stock_basic_data():
-    sql = 'select distinct list_date from stock_basic order by list_date desc limit 1'
-    last_list_date_df = read_data('stock', sql)
+    sql = 'select distinct list_date from stock.stock_basic order by list_date desc limit 1'
+    last_list_date_df = read_postgre_data(sql)
     last_list_date = last_list_date_df.loc[0]['list_date']
     df = pro.stock_basic()
     df.drop(df[(df.list_date <= last_list_date)].index, inplace=True)
@@ -63,8 +63,8 @@ def get_all_cb_basic_data():
     
 # 获取所有可转债的所有历史日行情数据
 def get_all_cb_md_data():
-    sql = 'SELECT ts_code FROM cb_basic'
-    ts_code = read_data('bond', sql)
+    sql = 'SELECT ts_code FROM bond.cb_basic'
+    ts_code = read_postgre_data(sql)
     for i in range(0, len(ts_code)):
         # 若调用次数达到限制，则在一分钟内反复尝试
         for _ in range(60):
@@ -99,8 +99,8 @@ def get_all_fut_basic_data():
 
 # 更新期货合约基本信息
 def update_fut_basic_data():
-    sql = 'select distinct list_date from fut_basic order by list_date desc limit 1'
-    last_list_date_df = read_data('futures', sql)
+    sql = 'select distinct list_date from future.fut_basic order by list_date desc limit 1'
+    last_list_date_df = read_postgre_data(sql)
     last_list_date = last_list_date_df.loc[0]['list_date']
     futuresExchanges = ['CFFEX', 'DCE', 'CZCE', 'SHFE', 'INE', 'GFEX']
     for exchange in futuresExchanges:
@@ -116,8 +116,8 @@ def update_fut_basic_data():
 # 获取所有期货合约的所有历史日行情数据
 def get_all_fut_md_data():
     # 去除主力/连续合约
-    sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is not NULL'
-    ts_code = read_data('futures', sql)
+    sql = 'SELECT ts_code FROM future.fut_basic WHERE per_unit is not NULL'
+    ts_code = read_postgre_data(sql)
     for i in range(0, len(ts_code)):
         # 若调用次数达到限制，则在一分钟内反复尝试
         for _ in range(60):
@@ -135,8 +135,8 @@ def get_all_fut_md_data():
 # 获取指定交易日所有期货合约的日行情数据
 def update_fut_md_data(trade_date = ''):
     # 去除主力/连续合约
-    sql = 'SELECT ts_code FROM fut_basic WHERE per_unit is NULL'
-    ts_code = read_data('futures', sql)
+    sql = 'SELECT ts_code FROM future.fut_basic WHERE per_unit is NULL'
+    ts_code = read_postgre_data(sql)
     code_list = ts_code['ts_code'].tolist()
     df = pro.fut_daily(**{"trade_date": trade_date})
     del_index = []
