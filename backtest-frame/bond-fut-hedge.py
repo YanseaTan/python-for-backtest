@@ -2,21 +2,19 @@
 # @Author: Yansea
 # @Date:   2024-02-01
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-01
+# @Last Modified time: 2024-02-02
 
-import struct
-from tkinter.tix import MAX
-from turtle import settiltangle
 import pandas as pd
 import xlwings as xw
 import datetime
+import time
 import os
 from copy import deepcopy
-import sys
-sys.path.append('.')
-from tools.DatabaseTools import *
+from sqlalchemy import create_engine
 
 DEFAULT_VALUE = 9999999
+
+setting_data = pd.DataFrame()
 
 init_fund = 0
 start_date = '20190101'
@@ -43,12 +41,21 @@ hedge_rate_2 = DEFAULT_VALUE
 cnt_of_level = 0
 each_level = 0
 
-def get_max_drawdown_sys(array):
-    array = pd.Series(array)
-    cumsum = array.cummax()
-    return max(cumsum-array)
+# 服务器 postgre 数据库用户配置
+postgre_user = 'postgres'
+postgre_password = 'shan3353'
+postgre_addr = '10.10.20.189:5432'
+postgre_database = 'future'
+
+# 创建 postgre 数据库操作引擎
+postgre_engine_ts = create_engine('postgresql://{}:{}@{}/{}?sslmode=disable'.format(postgre_user, postgre_password, postgre_addr, postgre_database))
+
+def read_postgre_data(sql):
+    df = pd.read_sql_query(sql, postgre_engine_ts)
+    return df
 
 def read_config(file_path):
+    print("读取设置文件...")
     global init_fund
     global start_date
     global end_date
@@ -71,13 +78,17 @@ def read_config(file_path):
     global cnt_of_level
     global each_level
     
+    global setting_data
+    setting_data = pd.read_excel(file_path)
+    setting_data = pd.DataFrame(setting_data)
+    
     app = xw.App(visible = False, add_book = False)
     app.display_alerts = False
     app.screen_updating = False
     workbook = app.books.open(file_path)
     ws = workbook.sheets.active
 
-    init_fund = ws.range('A3').value
+    init_fund = ws.range('A3').value * 10000
     start_date = str(ws.range('B3').value)[:8]
     end_date = str(ws.range('C3').value)[:8]
     if len(start_date) < 8 or len(end_date) < 8 or start_date >= end_date:
@@ -92,7 +103,7 @@ def read_config(file_path):
         return -1
     fut_multiplier = ws.range('C7').value
     margin_rate = ws.range('D7').value
-    margin_redundancy = ws.range('E7').value
+    margin_redundancy = 1 - ws.range('E7').value
     if fut_multiplier == 0 or margin_rate == 0 or margin_redundancy == 0:
         return -1
 
@@ -125,27 +136,46 @@ def read_config(file_path):
     workbook.close()
     app.quit()
     return 0
-    
 
-# def get_bond_list():
-    
+def get_max_drawdown_sys(array):
+    array = pd.Series(array)
+    cumsum = array.cummax()
+    return max(cumsum-array)
 
-def main():
-    ret = read_config('./backtest-frame/可转债-股指期货对冲回测框架设置.xlsx')
+def get_result_list(worth_list, result_name):
+    print("分析{}净值结果...".format(result_name))
+    result_list = [result_name]
+    max_drawdown = round(get_max_drawdown_sys(worth_list[1:]) * 100, 2)
+    result_list.append(str(max_drawdown) + '%')
+    profit = round((worth_list[len(worth_list) - 1] - 1) * 100, 2)
+    result_list.append(str(profit) + '%')
+    risk_rate = round(profit / max_drawdown, 1)
+    if risk_rate > 0:
+        result_list.append('1-' + str(risk_rate))
+    else:
+        result_list.append('/')
+    print("分析{}净值结果完毕！".format(result_name))
+    return result_list
+
+def write_bond_fut_data_to_xlsx():
+    ret = read_config('./可转债-股指期货对冲回测框架设置.xlsx')
     if ret != 0:
         print("设置读取错误，请检查设置文件！")
         exit(1)
     
     # 获取时间节点
+    print("获取交易日历...")
     sql = "select distinct trade_date from bond.cb_daily_test where trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(start_date, end_date)
     date_df = read_postgre_data(sql)
     cal_date_list = date_df['trade_date'].tolist()
+    date_unit = int(len(cal_date_list) / 8)
     date_list = []
     for i in range(0, len(date_df), alter_period):
         date = date_df.loc[i]['trade_date']
         date_list.append(date)
     
     # 获取不同时间节点的对冲比例以及代码列表
+    print("获取不同时间节点的对冲比例以及代码列表...")
     hedge_dict = {}
     for i in range(0, cnt_of_level):
         sub_hedge_dict = {}
@@ -175,15 +205,18 @@ def main():
     code_list = list(code_set)
     
     # 获取所有转债的收盘价信息
+    print("获取所有转债的收盘价信息...")
     close_dict = {}
+    sql = "select ts_code, trade_date, close from bond.cb_daily_test where trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(start_date, end_date)
+    close_df = read_postgre_data(sql)
     for code in code_list:
-        sql = "select trade_date, close from bond.cb_daily_test where ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(code, start_date, end_date)
-        close_df = read_postgre_data(sql)
-        trade_date_list = close_df['trade_date'].values.tolist()
-        close_list = close_df['close'].values.tolist()
+        df = close_df[close_df['ts_code'] == code]
+        trade_date_list = df['trade_date'].values.tolist()
+        close_list = df['close'].values.tolist()
         close_dict[code] = dict(zip(trade_date_list, close_list))
         
     # 获取股指期货的收盘价信息
+    print("获取股指期货的收盘价信息...")
     sql = "select trade_date, close from future.fut_daily where ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date, end_date)
     fut_close_df = read_postgre_data(sql)
     trade_date_list = fut_close_df['trade_date'].values.tolist()
@@ -191,6 +224,7 @@ def main():
     fut_close_dict = dict(zip(trade_date_list, close_list))
     
     # 计算每个交易日的转债多头资金变化
+    print("计算每个交易日的转债多头资金变化...")
     fund_list = [init_fund]
     sub_code_list = code_dict[cal_date_list[0]]
     per_fund = init_fund / len(sub_code_list)
@@ -223,25 +257,18 @@ def main():
             sub_code_list = list(set(sub_code_list) - set(resub_code_list))
     
     # 转债多头净值
+    print("计算转债多头净值...")
     worth_list = [round(v / init_fund, 4) for v in fund_list]
     mini_worth = min(worth_list)
     worth_list.insert(0, '转债多头净值')
 
     # 结果分析
     result_list = [['对冲比例', '最大回撤', '最终收益', '风险收益比']]
-    one_result_list = ['转债多头']
-    max_drawdown = round(get_max_drawdown_sys(worth_list[1:]) * 100, 2)
-    one_result_list.append(str(max_drawdown) + '%')
-    profit = round((worth_list[len(worth_list) - 1] - 1) * 100, 2)
-    one_result_list.append(str(profit) + '%')
-    risk_rate = round(profit / max_drawdown, 1)
-    if risk_rate > 0:
-        one_result_list.append('1-' + str(risk_rate))
-    else:
-        one_result_list.append('/')
+    one_result_list = get_result_list(worth_list, '转债多头')
     result_list.append(one_result_list)
     
     # 计算每个交易日的股指空头资金变化
+    print("计算每个交易日的股指空头资金变化...")
     fut_init_fund = fut_close_dict[cal_date_list[0]]
     fut_fund_list = [fut_init_fund]
     fut_remain_fund = fut_init_fund
@@ -253,24 +280,17 @@ def main():
         fut_fund_list.append(fut_remain_fund)
         
     # 股指空头净值
+    print("计算股指空头净值...")
     fut_worth_list = [round(v / fut_init_fund, 4) for v in fut_fund_list]
     mini_worth = min(mini_worth, min(fut_worth_list))
     fut_worth_list.insert(0, '{}空头净值'.format(fut_name))
     
     # 结果分析
-    one_result_list = ['{}空头'.format(fut_name)]
-    max_drawdown = round(get_max_drawdown_sys(fut_worth_list[1:]) * 100, 2)
-    one_result_list.append(str(max_drawdown) + '%')
-    profit = round((fut_worth_list[len(fut_worth_list) - 1] - 1) * 100, 2)
-    one_result_list.append(str(profit) + '%')
-    risk_rate = round(profit / max_drawdown, 1)
-    if risk_rate > 0:
-        one_result_list.append('1-' + str(risk_rate))
-    else:
-        one_result_list.append('/')
+    one_result_list = get_result_list(fut_worth_list, '{}空头'.format(fut_name))
     result_list.append(one_result_list)
     
     # 不同对冲风格的资金变化
+    print("计算不同对冲风格下的资金变化...")
     hedge_fund_list = [[init_fund] * cnt_of_level]
     hedge_remain_fund_list = [init_fund] * cnt_of_level
     sub_code_list = code_dict[cal_date_list[0]]
@@ -319,6 +339,7 @@ def main():
         
         if i == len(cal_date_list) - 1:
             break
+        # 重新进行资金分配
         if trade_date in date_list:
             sub_code_list = code_dict[trade_date]
             for j in range(0, cnt_of_level):
@@ -333,6 +354,7 @@ def main():
             sub_code_list = list(set(sub_code_list) - set(resub_code_list))
 
     # 对冲净值
+    print("计算不同对冲风格下的净值...")
     hedge_worth_list = []
     for i in range(0, len(cal_date_list)):
         sub_hedge_worth_list = [round(v / init_fund, 4) for v in hedge_fund_list[i]]
@@ -341,18 +363,8 @@ def main():
     
     hedge_mini_worth = 1
     for i in range(0, cnt_of_level):
-        one_result_list = ['对冲策略{}'.format(i + 1)]
-        one_hedge_worth_list = hedge_worth_list[i]
-        hedge_mini_worth = min(hedge_mini_worth, min(one_hedge_worth_list))
-        max_drawdown = round(get_max_drawdown_sys(one_hedge_worth_list) * 100, 2)
-        one_result_list.append(str(max_drawdown) + '%')
-        profit = round((one_hedge_worth_list[len(one_hedge_worth_list) - 1] - 1) * 100, 2)
-        one_result_list.append(str(profit) + '%')
-        risk_rate = round(profit / max_drawdown, 1)
-        if risk_rate > 0:
-            one_result_list.append('1-' + str(risk_rate))
-        else:
-            one_result_list.append('/')
+        hedge_mini_worth = min(hedge_mini_worth, min(hedge_worth_list[i]))
+        one_result_list = get_result_list(hedge_worth_list[i], '对冲策略{}'.format(i + 1))
         result_list.append(one_result_list)
         hedge_worth_list[i].insert(0, "对冲策略{}".format(i + 1))
     
@@ -363,9 +375,16 @@ def main():
     cal_date_list.insert(0, '日期')
     
     # 写入内容
+    print("向 Excel 写入内容...")
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    timeStr = time.strftime('%H-%M-%S')
+    if not os.path.exists('output/{}/'.format(todayStr)):
+        os.makedirs('output/{}/'.format(todayStr))
+    book_name = './output/{}/{}-{}-转债轮换-{}股指期货对冲净值回测-{}.xlsx'.format(todayStr, start_date, end_date, fut_name, timeStr)
     app = xw.App(visible=True,add_book=False)
     wb = app.books.add()
-    ws = wb.sheets.add()
+    ws = wb.sheets.add('净值曲线')
     ws.range('A1').options(transpose=True).value = cal_date_list
     ws.range('B1').options(transpose=True).value = worth_list
     ws.range('C1').options(transpose=True).value = fut_worth_list
@@ -380,11 +399,21 @@ def main():
     for i in range(0, 4):
         rng.columns[i][0].color = (200, 255, 200)
     ws.autofit()
+    wb.save(book_name)
+    wb.close()
+    app.quit()
+    
+    with pd.ExcelWriter(book_name, mode='a') as writer:
+        setting_data.to_excel(writer, sheet_name='参数设置', index=False)
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.open(book_name)
+    ws = wb.sheets['净值曲线']
     
     # 插入曲线
     # 转债多头-股指期货空头净值曲线
+    print("向 Excel 插入曲线...")
     cnt_of_date = len(worth_list)
-    chart = ws.charts.add(20, 200, 650, 400)
+    chart = ws.charts.add(20, 120, 800, 400)
     chart.set_source_data(ws.range((1,1),(cnt_of_date,3)))
     # Excel VBA 指令
     chart.chart_type = 'xy_scatter_lines_no_markers'
@@ -399,8 +428,8 @@ def main():
     chart.api[1].ChartTitle.Text = "转债多头-{}空头净值曲线".format(fut_name)     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
     chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
-    chart.api[1].Axes(2).MajorUnit = 0.02      # 纵坐标单位值
-    chart.api[1].Axes(1).MajorUnit = 60      # 横坐标单位值
+    chart.api[1].Axes(2).MajorUnit = 0.08      # 纵坐标单位值
+    chart.api[1].Axes(1).MajorUnit = date_unit      # 横坐标单位值
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
@@ -410,7 +439,7 @@ def main():
     
     # 对冲净值曲线
     cnt_of_date = len(hedge_worth_list[0])
-    chart = ws.charts.add(700, 200, 650, 400)
+    chart = ws.charts.add(20, 495, 800, 400)
     chart.set_source_data(ws.range((1,4),(cnt_of_date,4 + cnt_of_level)))
     # Excel VBA 指令
     chart.chart_type = 'xy_scatter_lines_no_markers'
@@ -425,8 +454,8 @@ def main():
     chart.api[1].ChartTitle.Text = "不同对冲风格净值曲线"     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
     chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
-    chart.api[1].Axes(2).MajorUnit = 0.02      # 纵坐标单位值
-    chart.api[1].Axes(1).MajorUnit = 60      # 横坐标单位值
+    chart.api[1].Axes(2).MajorUnit = 0.05      # 纵坐标单位值
+    chart.api[1].Axes(1).MajorUnit = date_unit      # 横坐标单位值
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
@@ -434,14 +463,16 @@ def main():
     chart.api[1].Axes(2).MinimumScale = hedge_mini_worth - 0.02
     chart.api[1].ChartStyle = 245       # 图表格式
     
-    today = datetime.date.today()
-    todayStr = today.strftime('%Y%m%d')
-    if not os.path.exists('output/{}/'.format(todayStr)):
-        os.makedirs('output/{}/'.format(todayStr))
-    wb.save('./output/{}/{}-{}-转债轮换-{}股指期货对冲净值回测.xlsx'.format(todayStr, start_date, end_date, fut_name))
+    if len(wb.sheets) > 1:
+        wb.sheets['Sheet1'].delete()
+    wb.save(book_name)
     wb.close()
     app.quit()
     print('转债-股指期货对冲净值回测 Excel 导出完毕！')
+    
+
+def main():
+    write_bond_fut_data_to_xlsx()
 
 if __name__ == "__main__":
     main()

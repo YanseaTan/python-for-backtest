@@ -169,3 +169,6 @@ trending-stock/收益率.xlsx
 output/
 .idea/
 .vscode/
+Pipfile
+*.lock
+*.ico
