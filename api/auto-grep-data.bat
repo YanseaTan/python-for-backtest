@@ -5,13 +5,14 @@
 
 C:  
 cd C:\Users\yanse\Desktop\repo\python-for-backtest
-start python ./sql/tushare-data-to-mysql/TushareDataToMySQL.py
-start python ./sql/tfapi-data-to-mysql/TFAPIDataToMySQL.py
-start python ./sql/tfapi-data-to-postgre/TFAPIDataToPostgre.py
+start mysql -u root -p0527
+timeout /t 10 >nul &
+start python ./api/tushare/TushareDataToSQL.py
+start python ./api/tfapi/TFAPIDataToSQL.py
 timeout /t 60 >nul &
-start python ./sql/tushare-data-to-mysql/FuturesMDToSpread.py
+start python ./proc/FuturesMDToSpread.py
 timeout /t 240 >nul &
-start python ./sql/tushare-data-to-mysql/UpdateSpreadConfig.py
+start python ./proc/UpdateSpreadConfig.py
 @REM timeout /t 600 >nul &
 @REM start python ./sql/tushare-data-to-mysql/WriteFundsDataToXlsx.py
 
