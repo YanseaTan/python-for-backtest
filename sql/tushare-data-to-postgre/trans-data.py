@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-01-25
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-25
+# @Last Modified time: 2024-02-19
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -27,14 +27,14 @@ def write_data(engine_ts, tableName, df):
     res = df.to_sql(tableName, engine_ts, index=False, if_exists='append', chunksize=5000)
     
 def main():
-    engine_ts = creat_engine_with_database('stock')
-    sql = "select * from stock_basic"
+    engine_ts = creat_engine_with_database('futures')
+    sql = "select * from fut_spread_daily where trade_date > 20240130 and trade_date < 20240205"
     df = read_data(engine_ts, sql)
     
     print(df)
     
     engine_ts = create_engine('postgresql://postgres:shan3353@10.10.20.189:5432/{}?sslmode=disable'.format('future'))
-    df.to_sql('stock_basic', engine_ts, 'stock', index=False, if_exists='append', chunksize=5000)
+    df.to_sql('fut_spread_daily', engine_ts, 'future', index=False, if_exists='append', chunksize=5000)
     
 
 

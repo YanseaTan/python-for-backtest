@@ -34,8 +34,8 @@ close_high = DEFAULT_VALUE
 vol_low = -DEFAULT_VALUE
 vol_high = DEFAULT_VALUE
 
-hedge_over_rate_1 = DEFAULT_VALUE
-hedge_over_rate_2 = DEFAULT_VALUE
+hedge_yield_1 = DEFAULT_VALUE
+hedge_yield_2 = DEFAULT_VALUE
 hedge_rate_1 = DEFAULT_VALUE
 hedge_rate_2 = DEFAULT_VALUE
 cnt_of_level = 0
@@ -71,8 +71,8 @@ def read_config(file_path):
     global close_high
     global vol_low
     global vol_high
-    global hedge_over_rate_1
-    global hedge_over_rate_2
+    global hedge_yield_1
+    global hedge_yield_2
     global hedge_rate_1
     global hedge_rate_2
     global cnt_of_level
@@ -122,11 +122,11 @@ def read_config(file_path):
     if yield_low >= yield_high or close_low >= close_high or vol_low >= vol_high:
         return -1
 
-    hedge_over_rate_1 = ws.range('A16').value
-    hedge_over_rate_2 = ws.range('A17').value
+    hedge_yield_1 = ws.range('A16').value
+    hedge_yield_2 = ws.range('A17').value
     hedge_rate_1 = ws.range('B16').value
     hedge_rate_2 = ws.range('B17').value
-    if hedge_over_rate_1 == DEFAULT_VALUE or hedge_over_rate_2 == DEFAULT_VALUE or hedge_rate_1 == DEFAULT_VALUE or hedge_rate_2 == DEFAULT_VALUE:
+    if hedge_yield_1 == DEFAULT_VALUE or hedge_yield_2 == DEFAULT_VALUE or hedge_rate_1 == DEFAULT_VALUE or hedge_rate_2 == DEFAULT_VALUE:
         return -1
     cnt_of_level = int(ws.range('C16').value)
     each_level = ws.range('D16').value
@@ -157,14 +157,8 @@ def get_result_list(worth_list, result_name):
     print("分析{}净值结果完毕！".format(result_name))
     return result_list
 
-def simulate_trade(trade_date, sale_list, buy_list, fut_code):
-    1
-    
-def instrument_fliter():
-    1
-
 def write_bond_fut_data_to_xlsx():
-    ret = read_config('./可转债-股指期货对冲回测框架设置-v2.xlsx')
+    ret = read_config('./可转债-股指期货对冲回测框架设置-v1.xlsx')
     if ret != 0:
         print("设置读取错误，请检查设置文件！")
         exit(1)
@@ -191,49 +185,27 @@ def write_bond_fut_data_to_xlsx():
     code_set = set()
     for i in range(0, len(date_list)):
         date = date_list[i]
-        sql = "select ts_code, yield_to_maturity, cb_over_rate from bond.cb_daily_test where trade_date = '{}' and yield_to_maturity >= {} and yield_to_maturity <= {}\
+        sql = "select ts_code, yield_to_maturity from bond.cb_daily_test where trade_date = '{}' and yield_to_maturity >= {} and yield_to_maturity <= {}\
             and close >= {} and close <= {} and vol >= {} and vol <= {}".format(date, yield_low, yield_high, close_low, close_high, vol_low, vol_high) 
         code_df = read_postgre_data(sql)
         code_list = code_df['ts_code'].tolist()
         code_dict[date] = code_list
         code_set = set(code_set | set(code_list))
         
-        yield_list = code_df['cb_over_rate'].tolist()
+        yield_list = code_df['yield_to_maturity'].tolist()
         yield_mean = sum(yield_list) / len(yield_list)
-        if yield_mean <= hedge_over_rate_1:
+        if yield_mean <= hedge_yield_1:
             hedge_rate = hedge_rate_1
-        elif yield_mean >= hedge_over_rate_2:
+        elif yield_mean >= hedge_yield_2:
             hedge_rate = hedge_rate_2
         else:
-            hedge_rate = hedge_rate_1 + (hedge_rate_2 - hedge_rate_1) / (hedge_over_rate_2 - hedge_over_rate_1) * yield_mean
+            hedge_rate = hedge_rate_1 + (hedge_rate_2 - hedge_rate_1) / (hedge_yield_2 - hedge_yield_1) * yield_mean
         for j in range(0, cnt_of_level):
             hedge_dict[j][date] = round(hedge_rate + j * each_level, 2)
-        
     code_list = list(code_set)
     
-    # 获取所有交易日股指期货的主力合约
-    print("获取所有交易日股指期货的主力合约...")
-    sql = "select ts_code, trade_date, vol from future.fut_daily where ts_code like %(tt)s and trade_date >= '{}' and trade_date <= '{}' and oi_chg is not NULL".format(start_date, end_date)
-    code_df = pd.read_sql_query(sql, postgre_engine_ts, params={'tt':fut_code + '%'})
-    ts_code_dict = {}
-    ts_code_set = set()
-    for i in range(0, len(cal_date_list)):
-        trade_date = cal_date_list[i]
-        fut_code_df = code_df[code_df['trade_date'] == trade_date]
-        fut_code_df.reset_index(drop=True, inplace=True)
-        max_vol = 0
-        for j in range(0, len(fut_code_df)):
-            max_vol = max(max_vol, fut_code_df.loc[j]['vol'])
-        fut_code_df = fut_code_df[fut_code_df['vol'] == max_vol]
-        fut_code_df.reset_index(drop=True, inplace=True)
-        ts_code = fut_code_df.loc[0]['ts_code']
-        ts_code_dict[trade_date] = ts_code
-        ts_code_set.add(ts_code)
-    
-    ts_code_list = list(ts_code_set)
-    
     # 获取所有转债的收盘价信息
-    print("获取所有可转债的收盘价信息...")
+    print("获取所有转债的收盘价信息...")
     close_dict = {}
     sql = "select ts_code, trade_date, close from bond.cb_daily_test where trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(start_date, end_date)
     close_df = read_postgre_data(sql)
@@ -245,14 +217,11 @@ def write_bond_fut_data_to_xlsx():
         
     # 获取股指期货的收盘价信息
     print("获取股指期货的收盘价信息...")
-    fut_close_dict = {}
-    sql = "select ts_code, trade_date, close from future.fut_daily where ts_code like %(tt)s and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(start_date, end_date)
-    fut_close_df = pd.read_sql_query(sql, postgre_engine_ts, params={'tt':fut_code + '%'})
-    for ts_code in ts_code_list:
-        df = fut_close_df[fut_close_df['ts_code'] == ts_code]
-        trade_date_list = df['trade_date'].values.tolist()
-        close_list = df['close'].values.tolist()
-        fut_close_dict[ts_code] = dict(zip(trade_date_list, close_list))
+    sql = "select trade_date, close from future.fut_daily where ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date, end_date)
+    fut_close_df = read_postgre_data(sql)
+    trade_date_list = fut_close_df['trade_date'].values.tolist()
+    close_list = fut_close_df['close'].values.tolist()
+    fut_close_dict = dict(zip(trade_date_list, close_list))
     
     # 计算每个交易日的转债多头资金变化
     print("计算每个交易日的转债多头资金变化...")
@@ -264,19 +233,18 @@ def write_bond_fut_data_to_xlsx():
         num_list = []
         resub_code_list = []
         trade_date = cal_date_list[i]
-        # 昨日买入
         for j in range(0, len(sub_code_list)):
             code = sub_code_list[j]
             close = close_dict[code][cal_date_list[i - 1]]
             num = int(per_fund / close)
             num_list.append(num)
             remain_fund -= num * close
-        # 今日卖出
         for j in range(0, len(sub_code_list)):
             code = sub_code_list[j]
             if trade_date in close_dict[code].keys():
                 close = close_dict[code][trade_date]
             else:
+                close = close_dict[code][cal_date_list[i - 1]]
                 resub_code_list.append(code)
             remain_fund += num_list[j] * close
         fund_list.append(remain_fund)
@@ -287,7 +255,6 @@ def write_bond_fut_data_to_xlsx():
             sub_code_list = code_dict[trade_date]
         elif len(resub_code_list):
             sub_code_list = list(set(sub_code_list) - set(resub_code_list))
-        per_fund = remain_fund / len(sub_code_list)
     
     # 转债多头净值
     print("计算转债多头净值...")
@@ -302,25 +269,19 @@ def write_bond_fut_data_to_xlsx():
     
     # 计算每个交易日的股指空头资金变化
     print("计算每个交易日的股指空头资金变化...")
-    fut_fund_list = [init_fund]
-    fut_remain_fund = init_fund
-    ts_code = ts_code_dict[cal_date_list[0]]
+    fut_init_fund = fut_close_dict[cal_date_list[0]]
+    fut_fund_list = [fut_init_fund]
+    fut_remain_fund = fut_init_fund
     for i in range(1, len(cal_date_list)):
         trade_date = cal_date_list[i]
-        # 昨日卖开
-        close = fut_close_dict[ts_code][cal_date_list[i - 1]]
-        fut_vol = int(fut_remain_fund * margin_redundancy / fut_multiplier / close)
-        fut_remain_fund += fut_vol * close * fut_multiplier
-        # 今日买平
-        close = fut_close_dict[ts_code][trade_date]
-        fut_remain_fund -= fut_vol * close * fut_multiplier
+        fut_pre_close = fut_close_dict[cal_date_list[i - 1]]
+        fut_close = fut_close_dict[trade_date]
+        fut_remain_fund += (fut_pre_close - fut_close)
         fut_fund_list.append(fut_remain_fund)
-
-        ts_code = ts_code_dict[trade_date]
         
     # 股指空头净值
     print("计算股指空头净值...")
-    fut_worth_list = [round(v / init_fund, 4) for v in fut_fund_list]
+    fut_worth_list = [round(v / fut_init_fund, 4) for v in fut_fund_list]
     mini_worth = min(mini_worth, min(fut_worth_list))
     fut_worth_list.insert(0, '{}空头净值'.format(fut_name))
     
@@ -335,21 +296,20 @@ def write_bond_fut_data_to_xlsx():
     sub_code_list = code_dict[cal_date_list[0]]
     per_fund_list = []
     fut_vol_list = []
-    ts_code = ts_code_dict[cal_date_list[0]]
     for i in range(0, cnt_of_level):
         hedge_rate = hedge_dict[i][cal_date_list[0]]
         bond_fund = init_fund / (1 + margin_rate * hedge_rate)
         per_fund = bond_fund / len(sub_code_list)
         per_fund_list.append(per_fund)
         fut_fund = init_fund - bond_fund
-        fut_vol = int(fut_fund * margin_redundancy / margin_rate / fut_multiplier / fut_close_dict[ts_code][cal_date_list[0]])
+        fut_vol = fut_fund * margin_redundancy / margin_rate / fut_multiplier / fut_close_dict[cal_date_list[0]]
         fut_vol_list.append(fut_vol)
     
     for i in range(1, len(cal_date_list)):
         num_list = []
         resub_code_list = []
         trade_date = cal_date_list[i]
-        # 昨日买入可转债，卖开股指期货
+        # 买入
         for j in range(0, len(sub_code_list)):
             code = sub_code_list[j]
             close = close_dict[code][cal_date_list[i - 1]]
@@ -360,9 +320,9 @@ def write_bond_fut_data_to_xlsx():
                 hedge_remain_fund_list[k] -= num * close
             num_list.append(sub_num_list)
         for k in range(0, cnt_of_level):
-            close = fut_close_dict[ts_code][cal_date_list[i - 1]]
+            close = fut_close_dict[cal_date_list[i - 1]]
             hedge_remain_fund_list[k] += close * fut_multiplier * fut_vol_list[k]
-        # 今日卖出可转债，买平股指期货
+        # 卖出
         for j in range(0, len(sub_code_list)):
             code = sub_code_list[j]
             if trade_date in close_dict[code].keys():
@@ -373,26 +333,23 @@ def write_bond_fut_data_to_xlsx():
             for k in range(0, cnt_of_level):
                 hedge_remain_fund_list[k] += num_list[j][k] * close
         for k in range(0, cnt_of_level):
-            close = fut_close_dict[ts_code][trade_date]
+            close = fut_close_dict[trade_date]
             hedge_remain_fund_list[k] -= close * fut_multiplier * fut_vol_list[k]
         hedge_fund_list.append(deepcopy(hedge_remain_fund_list))
         
         if i == len(cal_date_list) - 1:
             break
         # 重新进行资金分配
-        ts_code = ts_code_dict[trade_date]
-        for j in range(0, cnt_of_level):
-            if trade_date in hedge_dict[j].keys():
+        if trade_date in date_list:
+            sub_code_list = code_dict[trade_date]
+            for j in range(0, cnt_of_level):
                 hedge_rate = hedge_dict[j][trade_date]
                 bond_fund = hedge_remain_fund_list[j] / (1 + margin_rate * hedge_rate)
                 per_fund = bond_fund / len(sub_code_list)
                 per_fund_list[j] = per_fund
                 fut_fund = hedge_remain_fund_list[j] - bond_fund
-            fut_vol = int(fut_fund * margin_redundancy / margin_rate / fut_multiplier / fut_close_dict[ts_code][trade_date])
-            fut_vol_list[j] = fut_vol
-        
-        if trade_date in date_list:
-            sub_code_list = code_dict[trade_date]
+                fut_vol = fut_fund * margin_redundancy / margin_rate / fut_multiplier / fut_close_dict[trade_date]
+                fut_vol_list[j] = fut_vol
         elif len(resub_code_list):
             sub_code_list = list(set(sub_code_list) - set(resub_code_list))
 

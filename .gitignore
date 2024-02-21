@@ -167,6 +167,7 @@ trending-stock/可转债.xlsx
 trending-stock/收益率.xlsx
 *.xlsx
 output/
+temp/
 .idea/
 .vscode/
 Pipfile
