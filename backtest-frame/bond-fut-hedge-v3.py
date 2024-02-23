@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-22
+# @Last Modified time: 2024-02-23
 
 from turtle import position
 from numpy import NaN
@@ -150,7 +150,7 @@ def filter_code_list(trade_date, position_df):
         code_list = bond_code_df['ts_code'].tolist()
     else:
         code_list = position_df['ts_code'].tolist()
-        code_list.pop(len(code_list) - 1)
+        code_list.pop(0)
     
     fut_md_df.sort_values(by='vol', ascending=False, inplace=True)
     fut_md_df.reset_index(drop=True, inplace=True)
@@ -161,6 +161,7 @@ def filter_code_list(trade_date, position_df):
 # 根据资金情况以及所选合约计算详细仓位
 def calculate_position_dict(last_trade_date, trade_date, code_list):
     fund_df = get_fund_data(acct_id, last_trade_date)
+    fund_df.reset_index(drop=True, inplace=True)
     asset = fund_df.loc[0]['asset']
     
     global bond_daily_md_df
@@ -214,65 +215,100 @@ def calculate_order_list(trade_date, position_dict, position_df):
     # 股指期货交易指令
     fut_ts_code = list(position_dict.keys())[len(position_dict) - 1]
     fut_value_list = position_dict.pop(fut_ts_code)
+    fut_vol = fut_value_list[0]
+    fut_price = fut_value_list[1]
     fut_position_df = position_df[position_df.direction != 0].copy()
     fut_position_df.reset_index(drop=True, inplace=True)
-    
-    if len(fut_position_df) == 0:
-        order = [fut_ts_code, fut_value_list[0] * fut_multiplier, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_value_list[1]]
-        order_list.append(order)
-    elif fut_position_df.loc[0]['ts_code'] != fut_ts_code:
+    if len(fut_position_df) != 0:
         last_fut_ts_code = fut_position_df.loc[0]['ts_code']
         last_fut_vol = fut_position_df.loc[0]['vol']
-        global fut_daily_md_df
-        code_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == last_fut_ts_code))].copy()
-        code_df.reset_index(drop=True, inplace=True)
-        price = round(code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier, 2)
-        order = [last_fut_ts_code, last_fut_vol * fut_multiplier, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price]
-        order_list.append(order)
-        order = [fut_ts_code, fut_value_list[0] * fut_multiplier, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_value_list[1]]
-        order_list.append(order)
+        last_fut_price = fut_position_df.loc[0]['open_price']
+        if last_fut_ts_code != fut_ts_code:
+            global fut_daily_md_df
+            code_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == last_fut_ts_code))].copy()
+            code_df.reset_index(drop=True, inplace=True)
+            price = round(code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier, 2)
+            order = [last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price]
+            order_list.append(order)
+            close_profit = (price - last_fut_price) * last_fut_vol * fut_multiplier
+            CurrentFund['close_profit'] += close_profit
+            order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+            order_list.append(order)
+            add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
+        else:
+            fut_vol_diff = fut_vol - last_fut_vol
+            if fut_vol_diff > 0:
+                order = [fut_ts_code, fut_vol_diff, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+                order_list.append(order)
+                open_price = round(((last_fut_price * last_fut_vol) + (fut_price * fut_vol_diff)) / fut_vol, 2)
+                position_profit = round((fut_price - open_price) * fut_vol, 2)
+                add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, open_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
+            elif fut_vol_diff < 0:
+                order = [fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price]
+                order_list.append(order)
+                close_profit = (fut_price - last_fut_price) * fut_vol_diff * fut_multiplier
+                CurrentFund['close_profit'] += close_profit
+                position_profit = round((fut_price - last_fut_price) * fut_vol, 2)
+                add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, last_fut_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
     else:
-        fut_vol = fut_value_list[0] - fut_position_df.loc[0]['vol']
-        if fut_vol > 0:
-            order = [fut_ts_code, fut_vol * fut_multiplier, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_value_list[1]]
-            order_list.append(order)
-        elif fut_vol < 0:
-            order = [fut_ts_code, -fut_vol * fut_multiplier, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_value_list[1]]
-            order_list.append(order)
+        order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+        order_list.append(order)
+        add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
             
     # 可转债多头交易指令
     for code, value_list in position_dict.items():
+        vol = value_list[0]
+        price = value_list[1]
         if len(position_df) == 0 or position_df['ts_code'].value_counts(code)[0] == 0:
-            order = [code, value_list[0], DIRECTION_BUY, OPEN_CLOSE_NONE, value_list[1]]
+            order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price]
             order_list.append(order)
+            add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, price, 0)
         else:
             bond_position_df = position_df[position_df.ts_code == code].copy()
             bond_position_df.reset_index(drop=True, inplace=True)
-            vol = value_list[0] - bond_position_df.loc[0]['vol']
-            if vol > 0:
-                order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, value_list[1]]
+            last_vol = bond_position_df.loc[0]['vol']
+            last_price = bond_position_df.loc[0]['open_price']
+            vol_diff = vol - last_price
+            if vol_diff > 0:
+                order = [code, vol_diff, DIRECTION_BUY, OPEN_CLOSE_NONE, price]
                 order_list.append(order)
-            elif vol < 0:
-                order = [code, -vol, DIRECTION_SELL, OPEN_CLOSE_NONE, value_list[1]]
+                open_price = round(((last_price * last_vol) + (price * vol_diff)) / vol, 2)
+                position_profit = round((price - open_price) * vol, 2)
+                add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, open_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
+            elif vol_diff < 0:
+                order = [code, -vol_diff, DIRECTION_SELL, OPEN_CLOSE_NONE, price]
                 order_list.append(order)
-        
-    for i in range(0, len(position_df)):
-        code = position_df.loc[0]['ts_code']
+                close_profit = (price - last_price) * vol_diff
+                CurrentFund['close_profit'] += close_profit
+                position_profit = round((price - last_price) * vol, 2)
+                add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, last_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
+    
+    for i in range(1, len(position_df)):
+        code = position_df.loc[i]['ts_code']
         if code not in position_dict.keys():
             bond_position_df = position_df[position_df.ts_code == code].copy()
             bond_position_df.reset_index(drop=True, inplace=True)
+            last_price = bond_position_df.loc[0]['open_price']
+            last_vol = bond_position_df.loc[0]['vol']
             global bond_daily_md_df
             code_df = bond_daily_md_df[((bond_daily_md_df.trade_date == trade_date) & (bond_daily_md_df.ts_code == code))].copy()
             code_df.reset_index(drop=True, inplace=True)
             price = round(code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol'], 2)
-            order = [code, bond_position_df.loc[0]['vol'], DIRECTION_SELL, OPEN_CLOSE_NONE, price]
+            order = [code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price]
             order_list.append(order)
+            close_profit = (price - last_price) * last_vol
+            CurrentFund['close_profit'] += close_profit
     
+    CurrentFund['asset'] = CurrentFund['asset'] + CurrentFund['close_profit'] + CurrentFund['position_profit']
     return order_list
                 
 
 # 策略主线程
-def main():    
+def main():
     ret = read_config('./可转债-股指期货对冲回测框架设置-v3.xlsx')
     if ret != 0:
         print("设置读取错误，请检查设置文件！")
@@ -295,23 +331,31 @@ def main():
         last_trade_date = cal_date_list[i]
         trade_date = cal_date_list[i + 1]
         
+        # 获取最新昨日持仓
         position_df = get_position_data(acct_id, last_trade_date)
         position_df.reset_index(drop=True, inplace=True)
         
+        # 根据昨日市场数据以及昨日持仓，筛选今日可转债和期货合约
         code_list = filter_code_list(last_trade_date, position_df)
         
+        # 根据今日市场数据确定最终的今日所有可转债和期货合约的具体仓位
         position_dict = calculate_position_dict(last_trade_date, trade_date, code_list)
         
+        # 根据昨日持仓以及今日持仓计算得到今日的交易指令列表，更新【持仓数据】
         order_list = calculate_order_list(trade_date, position_dict, position_df)
         
+        # 根据交易指令列表向柜台发出交易指令，更新【成交数据】，【资金数据】
         for order in order_list:
             place_order(acct_id, trade_date, order)
-            
         add_fund_data(list(CurrentFund.values()))
         
+        trade = get_trade_data(acct_id)
+        print(trade)
+        pos = get_position_data(acct_id)
+        print(pos)
         fund = get_fund_data(acct_id)
         print(fund)
-        exit(1)
+        
             
         # trade_data = get_trade_data(acct_id)
         # print(trade_data)
@@ -331,3 +375,21 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    # full_data = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, close', '20190101', '20240201')
+    # code_list = ['IC1901.CFX', 'IC1902.CFX', 'IC1903.CFX', 'IC1904.CFX', 'IC1905.CFX', 'IC1906.CFX', 'IC1907.CFX', 'IC1908.CFX', 'IC1909.CFX', 'IC1910.CFX',
+    #              'IC1911.CFX', 'IC1912.CFX', 'IC2001.CFX', 'IC2002.CFX', 'IC2003.CFX', 'IC2004.CFX', 'IC2005.CFX', 'IC2006.CFX', 'IC2007.CFX', 'IC2008.CFX',
+    #              'IC2009.CFX', 'IC2010.CFX', 'IC2011.CFX', 'IC2012.CFX', 'IC2101.CFX', 'IC2102.CFX', 'IC2103.CFX', 'IC2104.CFX', 'IC2105.CFX', 'IC2106.CFX',
+    #              'IC2107.CFX', 'IC2108.CFX', 'IC2109.CFX', 'IC2110.CFX', 'IC2111.CFX', 'IC2112.CFX', 'IC2201.CFX', 'IC2202.CFX', 'IC2203.CFX', 'IC2204.CFX',
+    #              'IC2205.CFX', 'IC2206.CFX', 'IC2207.CFX', 'IC2208.CFX', 'IC2209.CFX', 'IC2210.CFX', 'IC2211.CFX', 'IC2212.CFX', 'IC2301.CFX', 'IC2302.CFX',
+    #              'IC2303.CFX', 'IC2304.CFX', 'IC2305.CFX', 'IC2306.CFX', 'IC2307.CFX', 'IC2308.CFX', 'IC2309.CFX', 'IC2310.CFX', 'IC2311.CFX', 'IC2312.CFX',
+    #              'IC2401.CFX', 'IC2402.CFX', 'IC2403.CFX', 'IC2404.CFX', 'IC2406.CFX', 'IC2409.CFX']
+    # with pd.ExcelWriter('中证500期货数据.xlsx') as writer:
+    #     for i in range(0, len(code_list)):
+    #         code = code_list[i]
+    #         data = full_data[full_data.ts_code == code].copy()
+    #         data.sort_values(by='trade_date', ascending=True, inplace=True)
+    #         data.reset_index(drop=True, inplace=True)
+    #         print(data)
+    #         data.to_excel(writer, sheet_name='Sheet{}'.format(i), index=False)
+    # exit(1)

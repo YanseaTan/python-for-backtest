@@ -641,5 +641,42 @@
         "index_name": "苯乙烯：江苏出罐价"
       }
     ]
+  },
+  {
+    "fut_code": "IC",
+    "index": [
+      {
+        "index_type": "现货价格",
+        "index_name": "中证500"
+      }
+    ]
+  }
+  ,
+  {
+    "fut_code": "IF",
+    "index": [
+      {
+        "index_type": "现货价格",
+        "index_name": "沪深300"
+      }
+    ]
+  },
+  {
+    "fut_code": "IM",
+    "index": [
+      {
+        "index_type": "现货价格",
+        "index_name": "中证1000"
+      }
+    ]
+  },
+  {
+    "fut_code": "IH",
+    "index": [
+      {
+        "index_type": "现货价格",
+        "index_name": "上证50"
+      }
+    ]
   }
 ]

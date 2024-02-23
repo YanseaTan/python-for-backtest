@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-11-16
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-26
+# @Last Modified time: 2024-02-23
 
 from FYAPI import FY_API
 import datetime
@@ -128,7 +128,14 @@ def main():
     index_name_list = ['库存-电解镍库存-国内社会库存-上期所库存', '库存-电解镍库存-国内社会库存-华东隐性库存', '库存-电解镍库存-国内社会库存-广东南储库存']
     merge_data(index_name_list, '电解镍国内社会库存（吨）')
     
-    # data = fy_api.Get_Data('库存-电解镍库存-国内社会库存-上期所库存')
+    # data = fy_api.Get_Data('中证500')
+    # for i in range(0, len(data)):
+    #     data.iloc[i, 1] = data.iloc[i, 1][:10].replace('-', '/')
+    #     data.iloc[i, 2] = float(data.iloc[i, 2]) / 3.15
+    # print(data)
+    # data.to_excel('中证500基差.xlsx', sheet_name='Sheet1', index=False)
+    
+    # data = fy_api.Get_Data('上证50')
     # print(data)
 
 
