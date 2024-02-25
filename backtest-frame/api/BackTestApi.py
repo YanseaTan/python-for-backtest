@@ -131,8 +131,7 @@ def get_result_list(worth_list, result_name):
             result_list.append('1-' + str(risk_rate))
         else:
             result_list.append('/')
-    years = len(worth_list)
-    year_profit = round((pow(worth_list[len(worth_list) - 1], 365 / years) - 1) * 100, 2)
+    year_profit = round((pow(worth_list[len(worth_list) - 1], 250 / len(worth_list)) - 1) * 100, 2)
     result_list.append(str(year_profit) + '%')
     print("分析{}净值结果完毕！".format(result_name))
     return result_list
@@ -144,10 +143,13 @@ def write_data_to_xlsx(book_name, setting_data):
     FundData.columns = ['账户ID', '交易日', '可用资金', '总资金', '平仓盈亏', '持仓盈亏']
     TradeData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
     TradeData['open_close'].replace([0, 1, 2], ['/', '开', '平'], inplace=True)
-    TradeData.columns = ['账户ID', '交易日', '合约代码', '持仓数量', '方向', '开平', '价格', '平仓盈亏']
+    TradeData.columns = ['账户ID', '交易日', '合约代码', '成交数量', '方向', '开平', '价格', '平仓盈亏']
+    PositionData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
+    PositionData.columns = ['账户ID', '交易日', '合约代码', '持仓数量', '方向', '开仓均价', '持仓盈亏']
     with pd.ExcelWriter(book_name) as writer:
         FundData.to_excel(writer, sheet_name='资金数据', index=False)
         TradeData.to_excel(writer, sheet_name='成交数据', index=False)
+        PositionData.to_excel(writer, sheet_name='持仓数据', index=False)
         setting_data.to_excel(writer, sheet_name='参数设置', index=False)
     
     # 计算净值，分析收益，插入曲线
