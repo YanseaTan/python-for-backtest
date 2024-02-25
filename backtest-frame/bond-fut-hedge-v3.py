@@ -154,7 +154,17 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     
     fut_md_df.sort_values(by='vol', ascending=False, inplace=True)
     fut_md_df.reset_index(drop=True, inplace=True)
-    code_list.append(fut_md_df.loc[0]['ts_code'])
+    fut_ts_code = fut_md_df.loc[0]['ts_code']
+    # 检查合约代码在当前以及下一个交易日是否存在交易
+    new_fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == trade_date)].copy()
+    next_fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == next_trade_date)].copy()
+    code_df = new_fut_md_df[new_fut_md_df.ts_code == fut_ts_code].copy()
+    code_df.reset_index(drop=True, inplace=True)
+    next_code_df = next_fut_md_df[next_fut_md_df.ts_code == fut_ts_code].copy()
+    next_code_df.reset_index(drop=True, inplace=True)
+    if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
+        fut_ts_code = fut_md_df.loc[1]['ts_code']
+    code_list.append(fut_ts_code)
     
     # 检查合约代码在当前以及下一个交易日是否存在交易
     bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
@@ -370,7 +380,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
         else:
             last_vol = bond_position_df.loc[0]['vol']
             last_price = bond_position_df.loc[0]['open_price']
-            vol_diff = vol - last_price
+            vol_diff = vol - last_vol
             if vol_diff > 0:
                 order = [code, vol_diff, DIRECTION_BUY, OPEN_CLOSE_NONE, price]
                 order_list.append(order)
@@ -386,22 +396,10 @@ def calculate_order_list(trade_date, position_dict, position_df):
                 position_profit = round((price - last_price) * vol, 2)
                 add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, last_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
-    
-    # for i in range(1, len(position_df)):
-    #     code = position_df.loc[i]['ts_code']
-    #     if code not in position_dict.keys():
-    #         bond_position_df = position_df[position_df.ts_code == code].copy()
-    #         bond_position_df.reset_index(drop=True, inplace=True)
-    #         last_price = bond_position_df.loc[0]['open_price']
-    #         last_vol = bond_position_df.loc[0]['vol']
-    #         global bond_daily_md_df
-    #         code_df = bond_daily_md_df[((bond_daily_md_df.trade_date == trade_date) & (bond_daily_md_df.ts_code == code))].copy()
-    #         code_df.reset_index(drop=True, inplace=True)
-    #         price = round(code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol'], 2)
-    #         order = [code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price]
-    #         order_list.append(order)
-    #         close_profit = (price - last_price) * last_vol
-    #         CurrentFund['close_profit'] += close_profit
+            else:
+                position_profit = round((price - last_price) * vol)
+                add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, last_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
     
     return order_list
                 
@@ -479,7 +477,7 @@ def main():
         trade = get_trade_data(acct_id, trade_date)
         print(trade)
         pos = get_position_data(acct_id, trade_date)
-        print(pos)
+        print(pos[pos.ts_code == '113570.SH'].copy())
         fund = get_fund_data(acct_id, trade_date)
         print(fund)
         
