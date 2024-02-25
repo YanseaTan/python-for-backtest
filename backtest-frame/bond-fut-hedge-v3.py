@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-25
+# @Last Modified time: 2024-02-26
 
 from turtle import pos, position
 from numpy import NaN
@@ -234,10 +234,10 @@ def calculate_bond_sell_order_list(trade_date, position_df, remove_code_list):
         code_df = bond_md_df[bond_md_df.ts_code == code].copy()
         code_df.reset_index(drop=True, inplace=True)
         price = round(code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol'], 2)
-        order = [code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price]
-        order_list.append(order)
         close_profit = round((price - last_price) * last_vol, 2)
         CurrentFund['close_profit'] += close_profit
+        order = [code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price, close_profit]
+        order_list.append(order)
         
     return order_list
 
@@ -255,15 +255,15 @@ def calculate_fut_close_order_list(trade_date, position_df, fut_ts_code, last_fu
     code_df = fut_md_df[fut_md_df.ts_code == last_fut_ts_code].copy()
     code_df.reset_index(drop=True, inplace=True)
     price = code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier
-    order = [last_fut_ts_code, last_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price]
-    order_list.append(order)
     close_profit = -round((price - last_price) * last_vol * fut_multiplier, 2)
     CurrentFund['close_profit'] += close_profit
+    order = [last_fut_ts_code, last_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, close_profit]
+    order_list.append(order)
     # 开新仓
     code_df = fut_md_df[fut_md_df.ts_code == fut_ts_code].copy()
     code_df.reset_index(drop=True, inplace=True)
     price = code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier
-    order = [fut_ts_code, last_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, price]
+    order = [fut_ts_code, last_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, price, 0]
     order_list.append(order)
     add_position_data(acct_id, trade_date, fut_ts_code, last_vol, DIRECTION_SELL, price, 0)
     
@@ -309,6 +309,8 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     code_df.reset_index(drop=True, inplace=True)
     price = code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier
     vol = int(fut_fund * margin_redundancy / margin_rate / fut_multiplier / price)
+    if vol == 0:
+        vol = 1
     value_list = [vol, round(price, 2)]
     position_dict[code] = value_list
     
@@ -334,27 +336,27 @@ def calculate_order_list(trade_date, position_dict, position_df):
             code_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == last_fut_ts_code))].copy()
             code_df.reset_index(drop=True, inplace=True)
             price = round(code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier, 2)
-            order = [last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price]
-            order_list.append(order)
             close_profit = -(price - last_fut_price) * last_fut_vol * fut_multiplier
             CurrentFund['close_profit'] += close_profit
-            order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+            order = [last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, close_profit]
+            order_list.append(order)
+            order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
             order_list.append(order)
             add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
         else:
             fut_vol_diff = fut_vol - last_fut_vol
             if fut_vol_diff > 0:
-                order = [fut_ts_code, fut_vol_diff, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+                order = [fut_ts_code, fut_vol_diff, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
                 order_list.append(order)
                 open_price = round(((last_fut_price * last_fut_vol) + (fut_price * fut_vol_diff)) / fut_vol, 2)
                 position_profit = -round((fut_price - open_price) * fut_vol * fut_multiplier, 2)
                 add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, open_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
             elif fut_vol_diff < 0:
-                order = [fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price]
-                order_list.append(order)
                 close_profit = -(fut_price - last_fut_price) * fut_vol_diff * fut_multiplier
                 CurrentFund['close_profit'] += close_profit
+                order = [fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price, close_profit]
+                order_list.append(order)
                 position_profit = -round((fut_price - last_fut_price) * fut_vol * fut_multiplier, 2)
                 add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, last_fut_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
@@ -363,7 +365,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
                 add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, last_fut_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
     else:
-        order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price]
+        order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
         order_list.append(order)
         add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
             
@@ -374,7 +376,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
         bond_position_df = position_df[position_df.ts_code == code].copy()
         bond_position_df.reset_index(drop=True, inplace=True)
         if len(bond_position_df) == 0:
-            order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price]
+            order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price, 0]
             order_list.append(order)
             add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, price, 0)
         else:
@@ -382,17 +384,17 @@ def calculate_order_list(trade_date, position_dict, position_df):
             last_price = bond_position_df.loc[0]['open_price']
             vol_diff = vol - last_vol
             if vol_diff > 0:
-                order = [code, vol_diff, DIRECTION_BUY, OPEN_CLOSE_NONE, price]
+                order = [code, vol_diff, DIRECTION_BUY, OPEN_CLOSE_NONE, price, 0]
                 order_list.append(order)
                 open_price = round(((last_price * last_vol) + (price * vol_diff)) / vol, 2)
                 position_profit = round((price - open_price) * vol, 2)
                 add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, open_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
             elif vol_diff < 0:
-                order = [code, -vol_diff, DIRECTION_SELL, OPEN_CLOSE_NONE, price]
-                order_list.append(order)
                 close_profit = (price - last_price) * vol_diff
                 CurrentFund['close_profit'] += close_profit
+                order = [code, -vol_diff, DIRECTION_SELL, OPEN_CLOSE_NONE, price, close_profit]
+                order_list.append(order)
                 position_profit = round((price - last_price) * vol, 2)
                 add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, last_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
@@ -411,9 +413,6 @@ def main():
         print("设置读取错误，请检查设置文件！")
         exit(1)
     
-    # 设置初始资金
-    set_init_fund(acct_id, start_date, init_fund)
-    
     # 获取交易日历以及行情数据
     global cal_date_list
     global bond_daily_md_df
@@ -421,11 +420,15 @@ def main():
     cal_date_list = get_cal_date_list(start_date, end_date)
     bond_daily_md_df = get_daily_md_data('bond', 'cb_daily_test', 'ts_code, trade_date, close, vol, amount, yield_to_maturity, cb_over_rate', start_date, end_date)
     fut_daily_md_df = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, vol, amount, oi_chg', start_date, end_date)
-    fut_daily_md_df = fut_daily_md_df[((fut_daily_md_df.ts_code.str.startswith(fut_code)) & (~fut_daily_md_df.oi_chg.isnull()))]
+    fut_daily_md_df = fut_daily_md_df[((fut_daily_md_df.ts_code.str.startswith(fut_code)) & (fut_daily_md_df.ts_code.str.len() > 6))]
+    
+    # 设置初始资金
+    set_init_fund(acct_id, cal_date_list[0], init_fund)
     
     # 时间驱动策略
     last_code_list = []
     for i in range(0, len(cal_date_list) - 2):
+    # for i in range(0, 12):
         last_trade_date = cal_date_list[i]
         trade_date = cal_date_list[i + 1]
         next_trade_date = cal_date_list[i + 2]
@@ -437,20 +440,25 @@ def main():
         # 根据昨日市场数据以及昨日持仓，筛选今日可转债和期货合约，并根据当前以及下一交易日这些合约是否存在，若不存在进行剔除
         code_list = filter_code_list(last_trade_date, trade_date, next_trade_date, position_df)
         remove_code_list = []
+        
+        # 若筛选出的代码列表与上一交易日相同，则仅进行持仓盈亏的更新，不进行交易操作
         if code_list == last_code_list:
             update_position_profit(trade_date, position_df, [])
         else:
+            # 将代码列表中减少的代码进行平仓操作
             remove_code_list = list(set(last_code_list[:-1]) - set(code_list[:-1]))
             order_list = calculate_bond_sell_order_list(trade_date, position_df, remove_code_list)
+            
+            # 若进入了新的周期，则进行仓位的重新分配，进行新开仓和补仓操作
             if alter_period == 1 or (total_days % alter_period) == 1:
                 # 根据今日市场数据确定最终的今日所有可转债和期货合约的具体仓位
                 position_dict = calculate_position_dict(last_trade_date, trade_date, code_list)
                 
-                # 根据昨日持仓以及今日持仓计算得到今日的交易指令列表，更新【持仓数据】
+                # 根据昨日持仓以及今日持仓计算得到今日的交易指令列表
                 buy_order_list = calculate_order_list(trade_date, position_dict, position_df)
                 order_list += buy_order_list
             else:
-                # 在周期内股指期货发生变化
+                # 在周期内若主力股指期货合约发生变化，则进行换仓操作
                 fut_ts_code = code_list[len(code_list) - 1]
                 last_fut_ts_code = last_code_list[len(last_code_list) - 1]
                 if fut_ts_code != last_fut_ts_code:
@@ -464,38 +472,33 @@ def main():
             for order in order_list:
                 place_order(acct_id, trade_date, order)
         
-        
+        # 更新账户资金数据
         CurrentFund['trade_date'] = trade_date
         last_fund = get_fund_data(acct_id, last_trade_date)
         last_fund.reset_index(drop=True, inplace=True)
         CurrentFund['asset'] = CurrentFund['asset'] + CurrentFund['close_profit'] + (CurrentFund['position_profit'] - last_fund.loc[0]['position_profit'])
         add_fund_data(list(CurrentFund.values()))
+        
+        print("交易日：{} | 总资金：{} | 平仓盈亏：{} | 持仓盈亏：{} | 回测进度：{}%".format(trade_date,
+              round(CurrentFund['asset'], 2), round(CurrentFund['close_profit'], 2), round(CurrentFund['position_profit'], 2), round((i + 1) / (len(cal_date_list) - 2) * 100, 2)))
         CurrentFund['close_profit'] = 0
         CurrentFund['position_profit'] = 0
         last_code_list = code_list
         
-        trade = get_trade_data(acct_id, trade_date)
-        print(trade)
-        pos = get_position_data(acct_id, trade_date)
-        print(pos[pos.ts_code == '113570.SH'].copy())
-        fund = get_fund_data(acct_id, trade_date)
-        print(fund)
-        
-            
-        # trade_data = get_trade_data(acct_id)
-        # print(trade_data)
-        # exit(1)
-        
-        
-        
-        
-        
-        
-        
-        
-        
-    
-    
+        # trade = get_trade_data(acct_id, trade_date)
+        # print(trade)
+        # pos = get_position_data(acct_id, trade_date)
+        # print(pos)
+        # fund = get_fund_data(acct_id, trade_date)
+        # print(fund)
+
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    timeStr = time.strftime('%H-%M-%S')
+    if not os.path.exists('output/{}/'.format(todayStr)):
+        os.makedirs('output/{}/'.format(todayStr))
+    book_name = './output/{}/{}-{}-转债轮换-{}股指期货对冲净值回测-{}.xlsx'.format(todayStr, start_date, end_date, fut_name, timeStr)
+    write_data_to_xlsx(book_name, setting_data)
 
 
 if __name__ == "__main__":
