@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-23
+# @Last Modified time: 2024-02-24
 
 import pandas as pd
 import xlwings as xw
@@ -113,7 +113,6 @@ def place_order(acct_id, trade_date, order):
     price = order[4]
     add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price)
     
-    CurrentFund['trade_date'] = trade_date 
     if open_close == OPEN_CLOSE_NONE:
         if direction == DIRECTION_BUY:
             CurrentFund['available'] -= price * vol
