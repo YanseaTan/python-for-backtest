@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-27
+# @Last Modified time: 2024-02-26
 
 import pandas as pd
 import xlwings as xw
@@ -30,34 +30,23 @@ fut_multiplier = 0
 margin_rate = 0
 margin_redundancy = 0
 
-filter_yield_low = -DEFAULT_VALUE
-filter_yield_high = DEFAULT_VALUE
-filter_close_low = -DEFAULT_VALUE
-filter_close_high = DEFAULT_VALUE
-filter_vol_low = -DEFAULT_VALUE
-filter_vol_high = DEFAULT_VALUE
+yield_low = -DEFAULT_VALUE
+yield_high = DEFAULT_VALUE
+close_low = -DEFAULT_VALUE
+close_high = DEFAULT_VALUE
+vol_low = -DEFAULT_VALUE
+vol_high = DEFAULT_VALUE
 
-cb_over_mean_1 = DEFAULT_VALUE
-cb_over_mean_2 = DEFAULT_VALUE
+hedge_over_rate_1 = DEFAULT_VALUE
+hedge_over_rate_2 = DEFAULT_VALUE
 hedge_rate_1 = DEFAULT_VALUE
 hedge_rate_2 = DEFAULT_VALUE
-fut_diff_1 = DEFAULT_VALUE
-fut_diff_2 = DEFAULT_VALUE
-hedge_rate_diff_1 = DEFAULT_VALUE
-hedge_rate_diff_2 = DEFAULT_VALUE
-
-close_close_low = -DEFAULT_VALUE
-close_close_high = DEFAULT_VALUE
-
-black_list = []
 
 # 过程参数
 total_days = 0
 cal_date_list = []
 bond_daily_md_df = pd.DataFrame()
 fut_daily_md_df = pd.DataFrame()
-index_daily_md_df = pd.DataFrame()
-fut_diff_rate_dict = {}
 
 # 读取策略参数
 def read_config(file_path):
@@ -72,23 +61,16 @@ def read_config(file_path):
     global fut_multiplier
     global margin_rate
     global margin_redundancy
-    global filter_yield_low
-    global filter_yield_high
-    global filter_close_low
-    global filter_close_high
-    global filter_vol_low
-    global filter_vol_high
-    global close_close_low
-    global close_close_high
-    global cb_over_mean_1
-    global cb_over_mean_2
+    global yield_low
+    global yield_high
+    global close_low
+    global close_high
+    global vol_low
+    global vol_high
+    global hedge_over_rate_1
+    global hedge_over_rate_2
     global hedge_rate_1
     global hedge_rate_2
-    global fut_diff_1
-    global fut_diff_2
-    global hedge_rate_diff_1
-    global hedge_rate_diff_2
-    global black_list
     
     global setting_data
     setting_data = pd.read_excel(file_path)
@@ -121,80 +103,36 @@ def read_config(file_path):
         return -1
 
     if ws.range('B11').value != None:
-        filter_yield_low = max(ws.range('B11').value, filter_yield_low)
+        yield_low = max(ws.range('B11').value, yield_low)
     if ws.range('B12').value != None:
-        filter_yield_high = min(ws.range('B12').value, filter_yield_high)
+        yield_high = min(ws.range('B12').value, yield_high)
     if ws.range('C11').value != None:
-        filter_close_low = max(ws.range('C11').value, filter_close_low)
+        close_low = max(ws.range('C11').value, close_low)
     if ws.range('C12').value != None:
-        filter_close_high = min(ws.range('C12').value, filter_close_high)
+        close_high = min(ws.range('C12').value, close_high)
     if ws.range('D11').value != None:
-        filter_vol_low = max(ws.range('D11').value, filter_vol_low)
+        vol_low = max(ws.range('D11').value, vol_low)
     if ws.range('D12').value != None:
-        filter_vol_high = min(ws.range('D12').value, filter_vol_high)
-    if filter_yield_low >= filter_yield_high or filter_close_low >= filter_close_high or filter_vol_low >= filter_vol_high:
+        vol_high = min(ws.range('D12').value, vol_high)
+    if yield_low >= yield_high or close_low >= close_high or vol_low >= vol_high:
         return -1
 
-    cb_over_mean_1 = ws.range('A16').value
-    cb_over_mean_2 = ws.range('A17').value
+    hedge_over_rate_1 = ws.range('A16').value
+    hedge_over_rate_2 = ws.range('A17').value
     hedge_rate_1 = ws.range('B16').value
     hedge_rate_2 = ws.range('B17').value
-    fut_diff_1 = ws.range('C16').value
-    fut_diff_2 = ws.range('C17').value
-    hedge_rate_diff_1 = ws.range('D16').value
-    hedge_rate_diff_2 = ws.range('D17').value
-    
-    if ws.range('B21').value != None:
-        close_close_low = max(ws.range('B21').value, close_close_low)
-    if ws.range('B22').value != None:
-        close_close_high = min(ws.range('B22').value, close_close_high)
-        
-    
+    if hedge_over_rate_1 == DEFAULT_VALUE or hedge_over_rate_2 == DEFAULT_VALUE or hedge_rate_1 == DEFAULT_VALUE or hedge_rate_2 == DEFAULT_VALUE:
+        return -1
     
     workbook.close()
     app.quit()
     return 0
-
-# 计算股指期货季连年华升贴水率
-def calculate_fut_diff_rate_dict():
-    print('计算股指期货季连年化升贴水率...')
-    global cal_date_list
-    global fut_daily_md_df
-    global index_daily_md_df
-    fut_diff_rate_dict = {}
-    for i in range(0, len(cal_date_list) - 2):
-        last_trade_date = cal_date_list[i]
-        trade_date = cal_date_list[i + 1]
-        next_trade_date = cal_date_list[i + 2]
-        
-        fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == last_trade_date)].copy()
-        
-        fut_md_df.sort_values(by='ts_code', ascending=True, inplace=True)
-        fut_md_df.reset_index(drop=True, inplace=True)
-        fut_ts_code = fut_md_df.loc[2]['ts_code']
-        fut_md_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == fut_ts_code))].copy()
-        fut_md_df.reset_index(drop=True, inplace=True)
-        fut_clsoe = fut_md_df.loc[0]['close']
-            
-        fut_md_df = fut_daily_md_df[(fut_daily_md_df.ts_code == fut_ts_code) & (fut_daily_md_df.trade_date >= next_trade_date)].copy()
-        days = len(fut_md_df)
-            
-        index_md_df = index_daily_md_df[index_daily_md_df.update_date == trade_date].copy()
-        index_md_df.reset_index(drop=True, inplace=True)
-        index_close = index_md_df.loc[0]['value']
-        
-        fut_diff = index_close - fut_clsoe
-        value = round(fut_diff * 250 * 100 / index_close / days, 2)
-        fut_diff_rate_dict[trade_date] = value
-        
-    return fut_diff_rate_dict
 
 # 更具筛选条件获取指定交易日的代码列表，列表末位为股指期货合约
 def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     global total_days
     total_days += 1
     code_list = []
-    remove_code_set = set()
     
     global bond_daily_md_df
     global fut_daily_md_df
@@ -202,36 +140,13 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == last_trade_date)].copy()
 
     if alter_period == 1 or (total_days % alter_period) == 1:
-        bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= filter_yield_low) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
-                                    (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) &
-                                    (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high))]
+        bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_low) & (bond_md_df.yield_to_maturity <= yield_high) &
+                                    (bond_md_df.close >= close_low) & (bond_md_df.close <= close_high) &
+                                    (bond_md_df.vol >= vol_low) & (bond_md_df.vol <= vol_high))]
         code_list = bond_code_df['ts_code'].tolist()
     else:
         code_list = position_df['ts_code'].tolist()
         code_list.pop(0)
-        # 排除周期内触碰平仓设置的代码
-        for i in range(0, len(code_list)):
-            code = code_list[i]
-            code_df = bond_md_df[bond_md_df.ts_code == code].copy()
-            code_df.reset_index(drop=True, inplace=True)
-            if code_df.loc[0]['close'] <= close_close_low or code_df.loc[0]['close'] >= close_close_high:
-                remove_code_set.add(code)
-        
-    # 检查合约代码在当前以及下一个交易日是否存在交易
-    bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
-    next_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == next_trade_date)].copy()
-    
-    # 排除当前以及下一个交易日已经到期或无交易量的代码
-    for i in range(0, len(code_list)):
-        code = code_list[i]
-        code_df = bond_md_df[bond_md_df.ts_code == code].copy()
-        code_df.reset_index(drop=True, inplace=True)
-        next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
-        next_code_df.reset_index(drop=True, inplace=True)
-        if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
-            remove_code_set.add(code)
-    for code in remove_code_set:
-        code_list.remove(code)
     
     fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
     fut_md_df.reset_index(drop=True, inplace=True)
@@ -246,6 +161,23 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
         fut_ts_code = fut_md_df.loc[1]['ts_code']
     code_list.append(fut_ts_code)
+    
+    # 检查合约代码在当前以及下一个交易日是否存在交易
+    bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
+    next_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == next_trade_date)].copy()
+    
+    # 排除当前以及下一个交易日已经到期或无交易量的代码
+    remove_code_list = []
+    for i in range(0, len(code_list) - 1):
+        code = code_list[i]
+        code_df = bond_md_df[bond_md_df.ts_code == code].copy()
+        code_df.reset_index(drop=True, inplace=True)
+        next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
+        next_code_df.reset_index(drop=True, inplace=True)
+        if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
+            remove_code_list.append(code)
+    for code in remove_code_list:
+        code_list.remove(code)
     
     return code_list
 
@@ -348,22 +280,12 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     # 根据全市场平均转股溢价率计算对冲比例
     cb_over_list = bond_md_df['cb_over_rate'].tolist()
     cb_over_mean = sum(cb_over_list) / len(cb_over_list)
-    if cb_over_mean <= cb_over_mean_1:
+    if cb_over_mean <= hedge_over_rate_1:
         hedge_rate = hedge_rate_1
-    elif cb_over_mean >= cb_over_mean_2:
+    elif cb_over_mean >= hedge_over_rate_2:
         hedge_rate = hedge_rate_2
     else:
-        hedge_rate = hedge_rate_1 + (hedge_rate_2 - hedge_rate_1) * (cb_over_mean - cb_over_mean_1) / (cb_over_mean_2 - cb_over_mean_1)
-    
-    # 根据股指期货季连合约年化升贴水率修正对冲比例
-    global fut_diff_rate_dict
-    fut_diff_rate = fut_diff_rate_dict[trade_date]
-    if fut_diff_rate <= fut_diff_1:
-        hedge_rate += hedge_rate_diff_1
-    elif fut_diff_rate >= fut_diff_2:
-        hedge_rate += hedge_rate_diff_2
-    else:
-        hedge_rate += hedge_rate_diff_1 + (hedge_rate_diff_2 - hedge_rate_diff_1) * (fut_diff_rate - fut_diff_1) / (fut_diff_2 - fut_diff_1)
+        hedge_rate = hedge_rate_1 + (hedge_rate_2 - hedge_rate_1) / (hedge_over_rate_2 - hedge_over_rate_1) * cb_over_mean
     
     bond_fund = asset / (1 + margin_rate * hedge_rate)
     per_fund = bond_fund / (len(code_list) - 1)
@@ -485,7 +407,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
 
 # 策略主线程
 def main():
-    ret = read_config('./可转债-股指期货对冲回测框架设置-v4.xlsx')
+    ret = read_config('./可转债-股指期货对冲回测框架设置-v3.xlsx')
     if ret != 0:
         print("设置读取错误，请检查设置文件！")
         exit(1)
@@ -494,18 +416,11 @@ def main():
     global cal_date_list
     global bond_daily_md_df
     global fut_daily_md_df
-    global index_daily_md_df
     cal_date_list = get_cal_date_list(start_date, end_date)
     bond_daily_md_df = get_daily_md_data('bond', 'cb_daily_test', 'ts_code, trade_date, close, vol, amount, yield_to_maturity, cb_over_rate', start_date, end_date)
-    fut_daily_md_df = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, close, vol, amount, oi, oi_chg', start_date, end_date)
+    fut_daily_md_df = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, vol, amount, oi, oi_chg', start_date, end_date)
     fut_daily_md_df = fut_daily_md_df[((fut_daily_md_df.ts_code.str.startswith(fut_code)) & (fut_daily_md_df.ts_code.str.len() > 6))]
-    sql = "select update_date, value from future.fut_funds where index_name = '{}' and update_date >= '{}' and update_date <= '{}'".format(fut_name, start_date, end_date)
-    index_daily_md_df = read_postgre_data(sql)
     
-    # 计算股指期货季连年华升贴水率
-    global fut_diff_rate_dict
-    fut_diff_rate_dict = calculate_fut_diff_rate_dict()
-
     # 设置初始资金
     set_init_fund(acct_id, cal_date_list[0], init_fund)
     
@@ -518,7 +433,7 @@ def main():
         next_trade_date = cal_date_list[i + 2]
         
         # 获取最新昨日持仓
-        position_df = get_last_position_data()
+        position_df = get_position_data(acct_id, last_trade_date)
         position_df.reset_index(drop=True, inplace=True)
         
         # 根据昨日市场数据以及昨日持仓，筛选今日可转债和期货合约，并根据当前以及下一交易日这些合约是否存在，若不存在进行剔除
@@ -568,6 +483,13 @@ def main():
         CurrentFund['close_profit'] = 0
         CurrentFund['position_profit'] = 0
         last_code_list = code_list
+        
+        # trade = get_trade_data(acct_id, trade_date)
+        # print(trade)
+        # pos = get_position_data(acct_id, trade_date)
+        # print(pos)
+        # fund = get_fund_data(acct_id, trade_date)
+        # print(fund)
 
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')

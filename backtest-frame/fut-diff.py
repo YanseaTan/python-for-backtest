@@ -41,12 +41,12 @@ def main():
         next_trade_date = cal_date_list[i + 2]
         
         fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == last_trade_date)].copy()
-        
         fut_md_df.sort_values(by='ts_code', ascending=True, inplace=True)
         fut_md_df.reset_index(drop=True, inplace=True)
         fut_ts_code = fut_md_df.loc[3]['ts_code']
-        fut_clsoe = fut_md_df.loc[3]['close']
-        
+        fut_md_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == fut_ts_code))].copy()
+        fut_md_df.reset_index(drop=True, inplace=True)
+        fut_clsoe = fut_md_df.loc[0]['close']
         
         # fut_ts_code = fut_md_df.loc[0]['ts_code']
         # fut_clsoe = fut_md_df.loc[0]['close']
@@ -109,7 +109,7 @@ def main():
     # chart.api[1].SetElement(334)      #x轴的网格线
     chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
     # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
-    chart.api[1].ChartTitle.Text = "下个季度合约连续年化升贴水率%"     #改变标题文本
+    chart.api[1].ChartTitle.Text = "下下个季度合约连续年化升贴水率%"     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
     # chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
     chart.api[1].Axes(2).MaximumScale = 50

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-26
+# @Last Modified time: 2024-02-27
 
 import pandas as pd
 import xlwings as xw
@@ -28,6 +28,8 @@ TradeData = pd.DataFrame(columns=['acct_id', 'trade_date', 'ts_code', 'vol', 'di
 
 # 账户持仓记录
 PositionData = pd.DataFrame(columns=['acct_id', 'trade_date', 'ts_code', 'vol', 'direction', 'open_price', 'position_profit'])
+CurrentPosition = pd.DataFrame(columns=['acct_id', 'trade_date', 'ts_code', 'vol', 'direction', 'open_price', 'position_profit'])
+last_trade_date = ''
 
 # 服务器 postgre 数据库用户配置
 postgre_user = 'postgres'
@@ -88,12 +90,20 @@ def get_trade_data(acct_id, trade_date = ''):
 # 账户持仓相关
 def add_position_data(acct_id, trade_date, ts_code, vol, direction, open_price, position_profit):
     PositionData.loc[len(PositionData)] = [acct_id, trade_date, ts_code, vol, direction, open_price, position_profit]
+    global last_trade_date
+    if trade_date != last_trade_date:
+        CurrentFund.clear()
+        last_trade_date = trade_date
+    CurrentFund.loc[len(PositionData)] = [acct_id, trade_date, ts_code, vol, direction, open_price, position_profit]
 
 def get_position_data(acct_id, trade_date = ''):
     if trade_date == '':
         return PositionData[PositionData.acct_id == acct_id]
     else:
         return PositionData[((PositionData.acct_id == acct_id) & (PositionData.trade_date == trade_date))]
+    
+def get_last_position_data():
+    return CurrentPosition
 
 # 进行下单操作，更新账户可用资金（忽略股指期货保证金占用）
 def place_order(acct_id, trade_date, order):
@@ -139,6 +149,7 @@ def get_result_list(worth_list, result_name):
 # 将结果输出至 Excel
 def write_data_to_xlsx(book_name, setting_data):
     # 写入基础数据
+    print('写入基础数据...')
     init_fund = FundData.loc[0]['asset']
     FundData.columns = ['账户ID', '交易日', '可用资金', '总资金', '平仓盈亏', '持仓盈亏']
     TradeData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
