@@ -4,15 +4,11 @@
 # @Last Modified by:   Yansea
 # @Last Modified time: 2024-02-26
 
-from turtle import pos, position
-from numpy import NaN
 import pandas as pd
 import xlwings as xw
 import datetime
 import time
 import os
-from copy import deepcopy
-from sqlalchemy import Update, create_engine
 import sys
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
@@ -152,7 +148,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         code_list = position_df['ts_code'].tolist()
         code_list.pop(0)
     
-    fut_md_df.sort_values(by='vol', ascending=False, inplace=True)
+    fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
     fut_md_df.reset_index(drop=True, inplace=True)
     fut_ts_code = fut_md_df.loc[0]['ts_code']
     # 检查合约代码在当前以及下一个交易日是否存在交易
@@ -257,6 +253,7 @@ def calculate_fut_close_order_list(trade_date, position_df, fut_ts_code, last_fu
     price = code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier
     close_profit = -round((price - last_price) * last_vol * fut_multiplier, 2)
     CurrentFund['close_profit'] += close_profit
+    CurrentFund['available'] += close_profit
     order = [last_fut_ts_code, last_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, close_profit]
     order_list.append(order)
     # 开新仓
@@ -338,6 +335,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
             price = round(code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier, 2)
             close_profit = -(price - last_fut_price) * last_fut_vol * fut_multiplier
             CurrentFund['close_profit'] += close_profit
+            CurrentFund['available'] += close_profit
             order = [last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, close_profit]
             order_list.append(order)
             order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
@@ -353,8 +351,9 @@ def calculate_order_list(trade_date, position_dict, position_df):
                 add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, open_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
             elif fut_vol_diff < 0:
-                close_profit = -(fut_price - last_fut_price) * fut_vol_diff * fut_multiplier
+                close_profit = (fut_price - last_fut_price) * fut_vol_diff * fut_multiplier
                 CurrentFund['close_profit'] += close_profit
+                CurrentFund['available'] += close_profit
                 order = [fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price, close_profit]
                 order_list.append(order)
                 position_profit = -round((fut_price - last_fut_price) * fut_vol * fut_multiplier, 2)
@@ -391,7 +390,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
                 add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, open_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
             elif vol_diff < 0:
-                close_profit = (price - last_price) * vol_diff
+                close_profit = -(price - last_price) * vol_diff
                 CurrentFund['close_profit'] += close_profit
                 order = [code, -vol_diff, DIRECTION_SELL, OPEN_CLOSE_NONE, price, close_profit]
                 order_list.append(order)
@@ -419,7 +418,7 @@ def main():
     global fut_daily_md_df
     cal_date_list = get_cal_date_list(start_date, end_date)
     bond_daily_md_df = get_daily_md_data('bond', 'cb_daily_test', 'ts_code, trade_date, close, vol, amount, yield_to_maturity, cb_over_rate', start_date, end_date)
-    fut_daily_md_df = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, vol, amount, oi_chg', start_date, end_date)
+    fut_daily_md_df = get_daily_md_data('future', 'fut_daily', 'ts_code, trade_date, vol, amount, oi, oi_chg', start_date, end_date)
     fut_daily_md_df = fut_daily_md_df[((fut_daily_md_df.ts_code.str.startswith(fut_code)) & (fut_daily_md_df.ts_code.str.len() > 6))]
     
     # 设置初始资金
