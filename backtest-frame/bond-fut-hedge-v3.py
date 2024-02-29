@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-27
+# @Last Modified time: 2024-02-29
 
 import pandas as pd
 import xlwings as xw
@@ -210,12 +210,12 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         code_list = position_df['ts_code'].tolist()
         code_list.pop(0)
         # 排除周期内触碰平仓设置的代码
-        for i in range(0, len(code_list)):
-            code = code_list[i]
-            code_df = bond_md_df[bond_md_df.ts_code == code].copy()
-            code_df.reset_index(drop=True, inplace=True)
-            if code_df.loc[0]['close'] <= close_close_low or code_df.loc[0]['close'] >= close_close_high:
-                remove_code_set.add(code)
+        # for i in range(0, len(code_list)):
+        #     code = code_list[i]
+        #     code_df = bond_md_df[bond_md_df.ts_code == code].copy()
+        #     code_df.reset_index(drop=True, inplace=True)
+        #     if code_df.loc[0]['close'] <= close_close_low or code_df.loc[0]['close'] >= close_close_high:
+        #         remove_code_set.add(code)
         
     # 检查合约代码在当前以及下一个交易日是否存在交易
     bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
@@ -339,6 +339,8 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     fund_df = get_fund_data(acct_id, last_trade_date)
     fund_df.reset_index(drop=True, inplace=True)
     asset = fund_df.loc[0]['asset']
+    # if trade_date >= '20200201' and trade_date <= '20210208':
+    #     asset /= 2
     
     global bond_daily_md_df
     global fut_daily_md_df
@@ -358,12 +360,16 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     # 根据股指期货季连合约年化升贴水率修正对冲比例
     global fut_diff_rate_dict
     fut_diff_rate = fut_diff_rate_dict[trade_date]
-    if fut_diff_rate <= fut_diff_1:
-        hedge_rate += hedge_rate_diff_1
-    elif fut_diff_rate >= fut_diff_2:
-        hedge_rate += hedge_rate_diff_2
-    else:
-        hedge_rate += hedge_rate_diff_1 + (hedge_rate_diff_2 - hedge_rate_diff_1) * (fut_diff_rate - fut_diff_1) / (fut_diff_2 - fut_diff_1)
+    # if fut_diff_rate <= fut_diff_1:
+    #     hedge_rate += hedge_rate_diff_1
+    # elif fut_diff_rate >= fut_diff_2:
+    #     hedge_rate += hedge_rate_diff_2
+    # else:
+    #     hedge_rate += hedge_rate_diff_1 + (hedge_rate_diff_2 - hedge_rate_diff_1) * (fut_diff_rate - fut_diff_1) / (fut_diff_2 - fut_diff_1)
+    if fut_diff_rate >= 10 and fut_diff_rate <= 20:
+        hedge_rate -= 0.1
+    # if fut_diff_rate <= 5:
+    #     hedge_rate += 0.1
     
     bond_fund = asset / (1 + margin_rate * hedge_rate)
     per_fund = bond_fund / (len(code_list) - 1)
@@ -445,7 +451,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
         order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
         order_list.append(order)
         add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
-            
+    
     # 可转债多头交易指令
     for code, value_list in position_dict.items():
         vol = value_list[0]
@@ -512,13 +518,12 @@ def main():
     # 时间驱动策略
     last_code_list = []
     for i in range(0, len(cal_date_list) - 2):
-    # for i in range(0, 12):
         last_trade_date = cal_date_list[i]
         trade_date = cal_date_list[i + 1]
         next_trade_date = cal_date_list[i + 2]
         
         # 获取最新昨日持仓
-        position_df = get_last_position_data()
+        position_df = get_position_data(acct_id, last_trade_date)
         position_df.reset_index(drop=True, inplace=True)
         
         # 根据昨日市场数据以及昨日持仓，筛选今日可转债和期货合约，并根据当前以及下一交易日这些合约是否存在，若不存在进行剔除
@@ -555,7 +560,6 @@ def main():
             # 根据交易指令列表向柜台发出交易指令，更新【成交数据】，【资金数据】
             for order in order_list:
                 place_order(acct_id, trade_date, order)
-        
         # 更新账户资金数据
         CurrentFund['trade_date'] = trade_date
         last_fund = get_fund_data(acct_id, last_trade_date)

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-27
+# @Last Modified time: 2024-02-28
 
 import pandas as pd
 import xlwings as xw
@@ -15,11 +15,7 @@ import sys
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 
-def main():
-    start_date = '20190101'
-    end_date = '20240201'
-    fut_code = 'IC'
-    
+def write_fut_diff_to_xlsx(start_date, end_date, fut_code):
     cal_date_list = get_cal_date_list(start_date, end_date)
     sql = "select ts_code, trade_date, close, vol, oi from future.fut_daily where trade_date >= '{}' and trade_date <= '{}'".format(start_date, end_date)
     fut_daily_md_df = read_postgre_data(sql)
@@ -47,19 +43,6 @@ def main():
         fut_md_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == fut_ts_code))].copy()
         fut_md_df.reset_index(drop=True, inplace=True)
         fut_clsoe = fut_md_df.loc[0]['close']
-        
-        # fut_ts_code = fut_md_df.loc[0]['ts_code']
-        # fut_clsoe = fut_md_df.loc[0]['close']
-        # # 检查合约代码在当前以及下一个交易日是否存在交易
-        # new_fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == trade_date)].copy()
-        # next_fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == next_trade_date)].copy()
-        # code_df = new_fut_md_df[new_fut_md_df.ts_code == fut_ts_code].copy()
-        # code_df.reset_index(drop=True, inplace=True)
-        # next_code_df = next_fut_md_df[next_fut_md_df.ts_code == fut_ts_code].copy()
-        # next_code_df.reset_index(drop=True, inplace=True)
-        # if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
-        #     fut_ts_code = fut_md_df.loc[1]['ts_code']
-        #     fut_clsoe = fut_md_df.loc[1]['close']
             
         fut_ts_code_list.append(fut_ts_code)
         fut_close_list.append(fut_clsoe)
@@ -126,10 +109,39 @@ def main():
     wb.save('IC隔季度合约连续升贴水情况.xlsx')
     wb.close()
     app.quit()
-        
-        
-        
 
+def write_index_to_xlsx(start_date, end_date, index_name):
+    cal_date_list = get_cal_date_list(start_date, end_date)
+    sql = "select update_date, value from future.fut_funds where index_name = '{}' and update_date >= '{}' and update_date <= '{}'".format(index_name, start_date, end_date)
+    index_daily_md_df = read_postgre_data(sql)
+    
+    date_list = ['日期']
+    index_close_list = [index_name]
+    for i in range(0, len(cal_date_list)):
+        trade_date = cal_date_list[i]
+        index_md_df = index_daily_md_df[index_daily_md_df.update_date == trade_date].copy()
+        index_md_df.reset_index(drop=True, inplace=True)
+        index_close = index_md_df.loc[0]['value']
+        index_close_list.append(index_close)
+        
+        date = trade_date[:4] + '/' + trade_date[4:6] + '/' + trade_date[6:8]
+        date_list.append(date)
+    
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.add()
+    ws = wb.sheets.add()
+    
+    ws.range('A1').options(transpose=True).value = date_list
+    ws.range('B1').options(transpose=True).value = index_close_list
+    ws.autofit()
+    wb.save('{}指数走势.xlsx'.format(index_name))
+    wb.close()
+    app.quit()
 
+def main():
+    # write_fut_diff_to_xlsx('20190101', '20240201', 'IC')
+    write_index_to_xlsx('20200203', '20210208', '中证500')
+    
+        
 if __name__ == "__main__":
     main()
