@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-29
+# @Last Modified time: 2024-03-01
 
 import pandas as pd
 import xlwings as xw
@@ -45,10 +45,10 @@ def read_postgre_data(sql):
 
 # 获取交易日历
 def get_cal_date_list(start_date, end_date):
-    print("获取交易日历...")
-    sql = "select distinct trade_date from bond.cb_daily_test where trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(start_date, end_date)
+    # print("获取交易日历...")
+    sql = "select cal_date from future.fut_cal_date where cal_date >= '{}' and cal_date <= '{}' order by cal_date".format(start_date, end_date)
     date_df = read_postgre_data(sql)
-    cal_date_list = date_df['trade_date'].tolist()
+    cal_date_list = date_df['cal_date'].tolist()
     return cal_date_list
 
 # 获取日行情数据
@@ -57,6 +57,20 @@ def get_daily_md_data(database_name, table_name, param_list, start_date, end_dat
     sql = "select {} from {}.{} where trade_date >= '{}' and trade_date <= '{}'".format(param_list, database_name, table_name, start_date, end_date)
     daily_md_df = read_postgre_data(sql)
     return daily_md_df
+
+# 计算期货的剩余天数
+delist_date_dict = {}
+def calculate_remain_days(ts_code, trade_date):
+    global delist_date_dict
+    if ts_code in delist_date_dict.keys():
+        delist_date = delist_date_dict[ts_code]
+    else:
+        sql = "select delist_date from future.fut_basic where ts_code = '{}'".format(ts_code)
+        delist_date_df = read_postgre_data(sql)
+        delist_date = delist_date_df.loc[0]['delist_date']
+        delist_date_dict[ts_code] = delist_date
+    cal_date_list = get_cal_date_list(trade_date, delist_date)
+    return len(cal_date_list) - 1
 
 # 账户资金相关
 def set_init_fund(acct_id, trade_date, asset):

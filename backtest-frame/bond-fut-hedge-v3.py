@@ -176,7 +176,6 @@ def calculate_fut_diff_rate_dict():
     for i in range(0, len(cal_date_list) - 2):
         last_trade_date = cal_date_list[i]
         trade_date = cal_date_list[i + 1]
-        next_trade_date = cal_date_list[i + 2]
         
         fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == last_trade_date)].copy()
         
@@ -187,8 +186,7 @@ def calculate_fut_diff_rate_dict():
         fut_md_df.reset_index(drop=True, inplace=True)
         fut_clsoe = fut_md_df.loc[0]['close']
             
-        fut_md_df = fut_daily_md_df[(fut_daily_md_df.ts_code == fut_ts_code) & (fut_daily_md_df.trade_date >= next_trade_date)].copy()
-        days = len(fut_md_df)
+        days = calculate_remain_days(fut_ts_code, trade_date)
             
         index_md_df = index_daily_md_df[index_daily_md_df.update_date == trade_date].copy()
         index_md_df.reset_index(drop=True, inplace=True)
@@ -263,9 +261,9 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         next_code_df.reset_index(drop=True, inplace=True)
         if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
             code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code_df.loc[0]['close'] >= close_level_dict[code] or\
-            now_code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code in black_list:
+            now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
         # if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
-        #     now_code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code in black_list:
+        #     now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
             remove_code_set.add(code)
     for code in remove_code_set:
         code_list.remove(code)
@@ -409,9 +407,13 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     # if fut_diff_rate <= 5:
     #     hedge_rate += 0.1
     
-    bond_fund = asset / (1 + margin_rate * hedge_rate)
-    per_fund = bond_fund / (len(code_list) - 1)
-    fut_fund = asset - bond_fund
+    if len(code_list) <= 1:
+        per_fund = 0
+        fut_fund = 0
+    else:
+        bond_fund = asset / (1 + margin_rate * hedge_rate)
+        per_fund = bond_fund / (len(code_list) - 1)
+        fut_fund = asset - bond_fund
     
     position_dict = {}
     for i in range(0, len(code_list) - 1):
@@ -420,6 +422,7 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
         code_df.reset_index(drop=True, inplace=True)
         price = code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol']
         vol = int(per_fund / price)
+        vol -= vol % 10
         value_list = [vol, round(price, 2)]
         position_dict[code] = value_list
     
@@ -567,7 +570,6 @@ def main():
         global black_list
         if trade_date in black_list_dict.keys():
             black_list += black_list_dict[trade_date]
-            print(trade_date, black_list)
         
         # 获取最新昨日持仓
         position_df = get_position_data(acct_id, last_trade_date)

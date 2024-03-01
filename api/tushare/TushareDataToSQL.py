@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-01
+# @Last Modified time: 2024-03-01
 
 import time
 import datetime
@@ -239,7 +239,13 @@ def update_fut_warehouse_data_sum(trade_date = ''):
     warehouse_sum_df = pd.DataFrame(warehouse_sum_dict)
     write_data('fut_warehouse_sum', 'futures', warehouse_sum_df)
     print('新增 {} 期货仓单汇总数据 {} 条！'.format(trade_date, len(warehouse_sum_df)))
-        
+
+# 获取最新的交易日历，一年更新一次就好
+def get_all_fut_cal_date():
+    cal_date_df = pro.trade_cal(**{"start_date":'19950101', "end_date":'20500101', "is_open":1}, fields=["cal_date"])
+    write_data('fut_cal_date', 'futures', cal_date_df)
+    print('新增交易日历数据 {} 条！'.format(len(cal_date_df)))
+
 # 每日将新增的各类昨日行情自动导入对应的表中
 def update_daily_data():
     update_stock_basic_data()
@@ -258,3 +264,4 @@ if __name__ == '__main__':
     pro = ts.pro_api(token)
     
     update_daily_data()
+    # get_all_fut_cal_date()
