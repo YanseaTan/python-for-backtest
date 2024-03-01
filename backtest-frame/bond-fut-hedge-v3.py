@@ -2,12 +2,13 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-29
+# @Last Modified time: 2024-03-01
 
 import pandas as pd
 import xlwings as xw
 import datetime
 import time
+import json
 import os
 import sys
 sys.path.append('./backtest-frame/api/')
@@ -49,6 +50,7 @@ hedge_rate_diff_2 = DEFAULT_VALUE
 close_close_low = -DEFAULT_VALUE
 close_close_high = DEFAULT_VALUE
 
+black_list_dict = {}
 black_list = []
 
 # 过程参数
@@ -58,6 +60,10 @@ bond_daily_md_df = pd.DataFrame()
 fut_daily_md_df = pd.DataFrame()
 index_daily_md_df = pd.DataFrame()
 fut_diff_rate_dict = {}
+
+# 测试参数
+yield_to_maturity_dict = {}
+close_level_dict = {}
 
 # 读取策略参数
 def read_config(file_path):
@@ -149,10 +155,15 @@ def read_config(file_path):
     if ws.range('B22').value != None:
         close_close_high = min(ws.range('B22').value, close_close_high)
         
-    
-    
     workbook.close()
     app.quit()
+    
+    global black_list_dict
+    f = open('./backtest-frame/black-list.json', 'r', encoding='utf-8')
+    content = f.read()
+    black_list_dict = json.loads(content)
+    f.close()
+    
     return 0
 
 # 计算股指期货季连年华升贴水率
@@ -189,6 +200,26 @@ def calculate_fut_diff_rate_dict():
         
     return fut_diff_rate_dict
 
+# 根据可转债发行规模定制不同可转债的开平仓条件
+def calculate_limit_by_issue_size():
+    print('根据可转债规模定制开平仓规则...')
+    global yield_to_maturity_dict
+    global close_level_dict
+    sql = "select ts_code, issue_size from bond.cb_basic"
+    issue_df = read_postgre_data(sql)
+    for i in range(0, len(issue_df)):
+        code = issue_df.loc[i]['ts_code']
+        issue_size = issue_df.loc[i]['issue_size']
+        if issue_size <= 500000000:
+            yield_to_maturity_dict[code] = 0.5
+            close_level_dict[code] = 130
+        elif issue_size > 500000000 and issue_size <= 1000000000:
+            yield_to_maturity_dict[code] = 1.5
+            close_level_dict[code] = 125
+        else:
+            yield_to_maturity_dict[code] = 2
+            close_level_dict[code] = 120
+
 # 更具筛选条件获取指定交易日的代码列表，列表末位为股指期货合约
 def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     global total_days
@@ -218,7 +249,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         #         remove_code_set.add(code)
         
     # 检查合约代码在当前以及下一个交易日是否存在交易
-    bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
+    now_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
     next_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == next_trade_date)].copy()
     
     # 排除当前以及下一个交易日已经到期或无交易量的代码
@@ -226,13 +257,20 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         code = code_list[i]
         code_df = bond_md_df[bond_md_df.ts_code == code].copy()
         code_df.reset_index(drop=True, inplace=True)
+        now_code_df = now_bond_md_df[now_bond_md_df.ts_code == code].copy()
+        now_code_df.reset_index(drop=True, inplace=True)
         next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
         next_code_df.reset_index(drop=True, inplace=True)
-        if len(code_df) == 0 or code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0:
+        if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
+            code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code_df.loc[0]['close'] >= close_level_dict[code] or\
+            now_code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code in black_list:
+        # if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
+        #     now_code_df.loc[0]['yield_to_maturity'] <= yield_to_maturity_dict[code] or code in black_list:
             remove_code_set.add(code)
     for code in remove_code_set:
         code_list.remove(code)
     
+    # 筛选股指期货
     fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
     fut_md_df.reset_index(drop=True, inplace=True)
     fut_ts_code = fut_md_df.loc[0]['ts_code']
@@ -511,6 +549,9 @@ def main():
     # 计算股指期货季连年华升贴水率
     global fut_diff_rate_dict
     fut_diff_rate_dict = calculate_fut_diff_rate_dict()
+    
+    # 根据可转债规模定制开平仓规则
+    calculate_limit_by_issue_size()
 
     # 设置初始资金
     set_init_fund(acct_id, cal_date_list[0], init_fund)
@@ -521,6 +562,12 @@ def main():
         last_trade_date = cal_date_list[i]
         trade_date = cal_date_list[i + 1]
         next_trade_date = cal_date_list[i + 2]
+        
+        # 更新黑名单
+        global black_list
+        if trade_date in black_list_dict.keys():
+            black_list += black_list_dict[trade_date]
+            print(trade_date, black_list)
         
         # 获取最新昨日持仓
         position_df = get_position_data(acct_id, last_trade_date)
