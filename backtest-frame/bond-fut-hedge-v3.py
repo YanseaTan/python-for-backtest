@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-01
+# @Last Modified time: 2024-03-04
 
 import pandas as pd
 import xlwings as xw
@@ -64,6 +64,7 @@ fut_diff_rate_dict = {}
 # 测试参数
 yield_to_maturity_dict = {}
 close_level_dict = {}
+highest_price_dict = {}
 
 # 读取策略参数
 def read_config(file_path):
@@ -265,6 +266,30 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         # if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
         #     now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
             remove_code_set.add(code)
+        if code in highest_price_dict.keys() and len(now_code_df) != 0:
+            highest_price = highest_price_dict[code]
+            close = now_code_df.loc[0]['close']
+            if (highest_price - close) / highest_price >= 0.1:
+                remove_code_set.add(code)
+                highest_price_dict.pop(code)
+                print(trade_date, code)
+            
+    # 入池后今日也没筛出来，但尚未满足平仓条件且距离最高位还没有跌破15%，那么不进行平仓
+    # for i in range(0, len(position_df) - 1):
+    #     code = position_df.loc[i]['ts_code']
+    #     if code in remove_code_set:
+    #         now_code_df = now_bond_md_df[now_bond_md_df.ts_code == code].copy()
+    #         now_code_df.reset_index(drop=True, inplace=True)
+    #         next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
+    #         next_code_df.reset_index(drop=True, inplace=True)
+    #         highest_price = highest_price_dict[code]
+    #         close = now_code_df.loc[0]['close']
+    #         if len(now_code_df) != 0 and now_code_df.loc[0]['vol'] != 0 and len(next_code_df) != 0 and next_code_df.loc[0]['vol'] != 0 and\
+    #             close < close_level_dict[code] and (highest_price - close) / highest_price < 0.15:
+    #             remove_code_set.remove(code)
+    #         if (highest_price - close) / highest_price >= 0.15:
+    #             print(trade_date, code)
+    
     for code in remove_code_set:
         code_list.remove(code)
     
@@ -319,6 +344,7 @@ def update_position_profit(trade_date, position_df, remove_code_list):
             position_profit = round((price - last_price) * last_vol, 2)
             add_position_data(acct_id, trade_date, last_ts_code, last_vol, DIRECTION_BUY, last_price, position_profit)
             CurrentFund['position_profit'] += position_profit
+            highest_price_dict[last_ts_code] = max(price, highest_price_dict[last_ts_code])
 
 # 更新可转债平仓盈亏情况（周期内仅有部分合约发生变动时不调整其他持仓，仅进行可转债平仓操作）
 def calculate_bond_sell_order_list(trade_date, position_df, remove_code_list):
@@ -375,8 +401,6 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     fund_df = get_fund_data(acct_id, last_trade_date)
     fund_df.reset_index(drop=True, inplace=True)
     asset = fund_df.loc[0]['asset']
-    # if trade_date >= '20200201' and trade_date <= '20210208':
-    #     asset /= 2
     
     global bond_daily_md_df
     global fut_daily_md_df
@@ -406,6 +430,26 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
         hedge_rate -= 0.1
     # if fut_diff_rate <= 5:
     #     hedge_rate += 0.1
+    
+    # 根据全市场平均收益率调整仓位 bata
+    yield_to_maturity_list = bond_md_df['yield_to_maturity'].tolist()
+    yield_to_maturity_mean = sum(yield_to_maturity_list) / len(yield_to_maturity_list)
+    if yield_to_maturity_mean <= 2 and yield_to_maturity_mean >= -2:
+        cut_rate_1 = (2 - yield_to_maturity_mean) / 16
+    elif yield_to_maturity_mean < -2:
+        cut_rate_1 = 0.25
+    else:
+        cut_rate_1 = 0
+        
+    # 根据全市场平均溢价率调整仓位 bata
+    if cb_over_mean <= 70 and cb_over_mean >= 15:
+        cut_rate_2 = (70 - cb_over_mean) / 220
+    elif cb_over_mean < 15:
+        cut_rate_2 = 0.25
+    else:
+        cut_rate_2 = 0
+        
+    asset *= (1 - cut_rate_1 - cut_rate_2)
     
     if len(code_list) <= 1:
         per_fund = 0
@@ -503,6 +547,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
             order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price, 0]
             order_list.append(order)
             add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, price, 0)
+            highest_price_dict[code] = price
         else:
             last_vol = bond_position_df.loc[0]['vol']
             last_price = bond_position_df.loc[0]['open_price']
@@ -526,6 +571,7 @@ def calculate_order_list(trade_date, position_dict, position_df):
                 position_profit = round((price - last_price) * vol)
                 add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, last_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
+            highest_price_dict[code] = max(price, highest_price_dict[code])
     
     return order_list
                 
@@ -609,6 +655,7 @@ def main():
             # 根据交易指令列表向柜台发出交易指令，更新【成交数据】，【资金数据】
             for order in order_list:
                 place_order(acct_id, trade_date, order)
+        
         # 更新账户资金数据
         CurrentFund['trade_date'] = trade_date
         last_fund = get_fund_data(acct_id, last_trade_date)

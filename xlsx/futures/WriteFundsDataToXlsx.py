@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-26
+# @Last Modified time: 2024-03-05
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -361,6 +361,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
                     date = '24' + df.loc[k]['trade_date'][-4:]
                 else:
                     date = '23' + df.loc[k]['trade_date'][-4:]
+                if date == '230229':
+                    date = '230228'
                 date_set.add(date)
                 start_date = min(start_date, date)
                 end_date = max(end_date, date)
@@ -368,6 +370,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
                 close_dict[date] = df.loc[k]['close']
             comb_dict[ts_code] = close_dict
         date_list = sorted(date_set)
+        
+        add_year = int(end_date[:2]) - int(start_date[:2])
         
         # 将价差数据整理为二维表格
         data_list = []
@@ -389,7 +393,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
             ts_code = ts_code_df.loc[j]['ts_code']
             first_leg = ts_code[:ts_code.index('-')]
             first_leg_list = [first_leg + '%']
-            start_date_new = '20' + str(int(ts_code[ts_code.index('-') - 4:ts_code.index('-') - 2]) - 1) + start_date[-4:]
+            start_date_new = '20' + str(int(ts_code[ts_code.index('-') - 4:ts_code.index('-') - 2]) - add_year) + start_date[-4:]
             end_date_new = '20' + ts_code[ts_code.index('-') - 4:ts_code.index('-') - 2] + end_date[-4:]
             sql = "select trade_date, close from fut_daily where ts_code like %(tt)s and close is not NULL and trade_date >= '{}' and trade_date <= '{}' order by trade_date;".format(start_date_new, end_date_new)
             engine_ts = create_engine('mysql://{}:{}@/{}?charset=utf8&use_unicode=1'.format(mysql_user, mysql_password, 'futures'))
@@ -427,7 +431,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
             first_list.append(close_list)
             
         # 获取历史现货价格和期货价格，手动计算基差
-        start_date_new = str(int(last_trade_date[:4]) - 1) + start_date[-4:]
+        start_date_new = str(int(last_trade_date[:4]) - add_year) + start_date[-4:]
         end_date_new = last_trade_date[:4] + end_date[-4:]
         sql = "select update_date, value from fut_funds where fut_code = '{}' and index_type = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(fut_code, '现货价格', start_date_new, end_date_new)
         spot_price_df = read_data('futures', sql)
@@ -436,7 +440,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         nearly_close_df = pd.read_sql_query(sql, engine_ts, params={'tt':nearly_ts_code_list})
         basis_dict = {}
         minBasis = 99999
-        start_date_new = start_date_new[:4] + '/' + start_date_new[4:6] + '/' + start_date_new[-2:]
+        spot_start_year = start_date_new[2:4]
+        start_date_new = start_date_new[:2] + '23' + '/' + start_date_new[4:6] + '/' + start_date_new[-2:]
         basis_dict[start_date_new] = ''
         for i in range(0, len(spot_price_df)):
             date = spot_price_df.loc[i]['update_date']
@@ -445,10 +450,19 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
                 close_df = nearly_close_df[nearly_close_df['trade_date'] == date]
                 close_df.reset_index(drop=True, inplace=True)
                 close = close_df.loc[0]['close']
+                if date[2:4] > spot_start_year:
+                    date = '2024' + date[-4:]
+                else:
+                    date = '2023' + date[-4:]
+                if date == '20230229':
+                    date = '20230228'
                 date = date[:4] + '/' + date[4:6] + '/' + date[-2:]
                 basis_dict[date] = spot_price - close
                 minBasis = min(minBasis, (spot_price - close))
-        end_date_new = end_date_new[:4] + '/' + end_date_new[4:6] + '/' + end_date_new[-2:]
+        if end_date_new[2:4] > spot_start_year:
+            end_date_new = end_date_new[:2] + '24' + '/' + end_date_new[4:6] + '/' + end_date_new[-2:]
+        else:
+            end_date_new = end_date_new[:2] + '23' + '/' + end_date_new[4:6] + '/' + end_date_new[-2:]
         if end_date_new not in basis_dict.keys():
             basis_dict[end_date_new] = ''
         basis_list = [[k, v] for k, v in basis_dict.items()]
@@ -458,9 +472,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         inventory_dict = {}
         start_year = {}
         for i in range(0, cnt_of_year):
-            add_year = int(end_date[:2]) - int(start_date[:2])
-            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i) + start_date[-4:]
-            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year) + end_date[-4:]
+            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1 - add_year) + start_date[-4:]
+            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1) + end_date[-4:]
             sql = "select update_date, value from fut_funds where fut_code = '{}' and index_name = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(fut_code, index_name, start_date_new, end_date_new)
             df = read_data('futures', sql)
             start_year[i] = df.loc[0]['update_date'][2:4]
@@ -498,9 +511,8 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
         warehouse_dict = {}
         start_year = {}
         for i in range(0, cnt_of_year):
-            add_year = int(end_date[:2]) - int(start_date[:2])
-            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i) + start_date[-4:]
-            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + add_year) + end_date[-4:]
+            start_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1 - add_year) + start_date[-4:]
+            end_date_new = '20' + str(int(last_trade_date[2:4]) - cnt_of_year + i + 1) + end_date[-4:]
             sql = "select trade_date, vol from fut_warehouse_sum where symbol = '{}' and vol is not NULL and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, start_date_new, end_date_new)
             vol_df = read_data('futures', sql)
             if len(vol_df):
@@ -725,7 +737,7 @@ def write_all_spread_funds_to_xlsx():
                   ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
                   ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '电解镍国内社会库存（吨）'],
                   ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
-    # param_list = [['NI', '电解镍国内社会库存（吨）']]
+    # param_list = [['M', '豆粕库存_中国']]
     for i in param_list:
         write_spread_funds_to_xlsx(i[0], i[1])
 
