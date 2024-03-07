@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Author: Yansea
-# @Date:   2024-02-22
+# @Date:   2024-03-07
 # @Last Modified by:   Yansea
 # @Last Modified time: 2024-03-07
 
@@ -14,38 +14,21 @@ import sys
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 
-# 策略参数
-DEFAULT_VALUE = 9999999
-
-setting_data = pd.DataFrame()
-
-acct_id = 'default'
-init_fund = 0
+acct_id = 'hailong'
+init_fund = 20000000
 start_date = '20190101'
-end_date = '20240101'
-per_fund = 0
+end_date = '20240229'
+per_fund = 150000
 
-fut_name = ''
-fut_code = ''
-fut_multiplier = 0
-margin_rate = 0
-margin_redundancy = 0
+fut_name = '中证500'
+fut_code = 'IC'
+fut_multiplier = 200
+margin_rate = 0.2
 
-filter_yield_low = -DEFAULT_VALUE
-filter_yield_high = DEFAULT_VALUE
-filter_close_low = -DEFAULT_VALUE
-filter_close_high = DEFAULT_VALUE
-filter_vol_low = -DEFAULT_VALUE
-filter_vol_high = DEFAULT_VALUE
-
-cb_over_mean_1 = DEFAULT_VALUE
-cb_over_mean_2 = DEFAULT_VALUE
-hedge_rate_1 = DEFAULT_VALUE
-hedge_rate_2 = DEFAULT_VALUE
-fut_diff_1 = DEFAULT_VALUE
-fut_diff_2 = DEFAULT_VALUE
-hedge_rate_diff_1 = DEFAULT_VALUE
-hedge_rate_diff_2 = DEFAULT_VALUE
+cb_over_mean_1 = 20
+cb_over_mean_2 = 60
+hedge_rate_1 = 0.7
+hedge_rate_2 = 0.3
 
 black_list_dict = {}
 black_list = []
@@ -58,118 +41,30 @@ index_daily_md_df = pd.DataFrame()
 fut_diff_rate_dict = {}
 
 # 测试参数
-issue_size_level_1 = 500000000
-issue_size_level_2 = 1000000000
-close_level_1 = 135
-close_level_2 = 130
-close_level_3 = 125
-yield_to_maturity_level_1 = 1.5
-yield_to_maturity_level_2 = 2
-yield_to_maturity_level_3 = 2.5
+issue_size_level_1 = 1000000000
+issue_size_level_2 = 5000000000
+issue_size_level_3 = 10000000000
+buy_cb_over_level_1 = 15
+buy_cb_over_level_2 = 10
+buy_cb_over_level_3 = 5
+buy_cb_over_level_4 = 2
+sell_cb_over_level_1 = 30
+sell_cb_over_level_2 = 25
+sell_cb_over_level_3 = 20
+sell_cb_over_level_4 = 10
+buy_cb_over_dict = {}
+sell_cb_over_dict = {}
 issue_size_code_set_1 = set()
 issue_size_code_set_2 = set()
 issue_size_code_set_3 = set()
-per_fund_1 = 400000
-per_fund_2 = 500000
-per_fund_3 = 600000
-max_len_of_single_code_set = 70
-yield_to_maturity_dict = {}
-close_level_dict = {}
+issue_size_code_set_4 = set()
+max_buy_price = 130
+max_len_of_single_code_set = 50
 highest_price_dict = {}
+max_drawdown = 0.15
 
-# 读取策略参数
-def read_config(file_path):
-    print("读取设置文件...")
-    global acct_id
-    global init_fund
-    global start_date
-    global end_date
-    global per_fund
-    global fut_name
-    global fut_code
-    global fut_multiplier
-    global margin_rate
-    global margin_redundancy
-    global filter_yield_low
-    global filter_yield_high
-    global filter_close_low
-    global filter_close_high
-    global filter_vol_low
-    global filter_vol_high
-    global cb_over_mean_1
-    global cb_over_mean_2
-    global hedge_rate_1
-    global hedge_rate_2
-    global fut_diff_1
-    global fut_diff_2
-    global hedge_rate_diff_1
-    global hedge_rate_diff_2
-    global black_list
-    
-    global setting_data
-    setting_data = pd.read_excel(file_path)
-    setting_data = pd.DataFrame(setting_data)
-    
-    app = xw.App(visible = False, add_book = False)
-    app.display_alerts = False
-    app.screen_updating = False
-    workbook = app.books.open(file_path)
-    ws = workbook.sheets.active
-
-    acct_id = str(ws.range('A3').value)
-    init_fund = ws.range('B3').value * 10000
-    start_date = str(ws.range('C3').value)[:8]
-    end_date = str(ws.range('D3').value)[:8]
-    if len(start_date) < 8 or len(end_date) < 8 or start_date >= end_date:
-        return -1
-    per_fund = ws.range('E3').value * 10000
-    if init_fund <= 0 or per_fund <= 0:
-        return -1
-    
-    fut_name = str(ws.range('A7').value)
-    fut_code = str(ws.range('B7').value)
-    if fut_name == '' or fut_code == '':
-        return -1
-    fut_multiplier = ws.range('C7').value
-    margin_rate = ws.range('D7').value
-    margin_redundancy = 1 - ws.range('E7').value
-    if fut_multiplier == 0 or margin_rate == 0 or margin_redundancy == 0:
-        return -1
-
-    if ws.range('B11').value != None:
-        filter_yield_low = max(ws.range('B11').value, filter_yield_low)
-    if ws.range('B12').value != None:
-        filter_yield_high = min(ws.range('B12').value, filter_yield_high)
-    if ws.range('C11').value != None:
-        filter_close_low = max(ws.range('C11').value, filter_close_low)
-    if ws.range('C12').value != None:
-        filter_close_high = min(ws.range('C12').value, filter_close_high)
-    if ws.range('D11').value != None:
-        filter_vol_low = max(ws.range('D11').value, filter_vol_low)
-    if ws.range('D12').value != None:
-        filter_vol_high = min(ws.range('D12').value, filter_vol_high)
-    if filter_yield_low >= filter_yield_high or filter_close_low >= filter_close_high or filter_vol_low >= filter_vol_high:
-        return -1
-
-    cb_over_mean_1 = ws.range('A16').value
-    cb_over_mean_2 = ws.range('A17').value
-    hedge_rate_1 = ws.range('B16').value
-    hedge_rate_2 = ws.range('B17').value
-    fut_diff_1 = ws.range('C16').value
-    fut_diff_2 = ws.range('C17').value
-    hedge_rate_diff_1 = ws.range('D16').value
-    hedge_rate_diff_2 = ws.range('D17').value
-        
-    workbook.close()
-    app.quit()
-    
-    global black_list_dict
-    f = open('./backtest-frame/black-list.json', 'r', encoding='utf-8')
-    content = f.read()
-    black_list_dict = json.loads(content)
-    f.close()
-    
-    return 0
+setting_data = pd.DataFrame(columns=['init_fund', 'start_date', 'end_date', 'fut_code', 'fut_multiplier', 'margin_rate', 'cb_over_mean_1', 'hedge_rate_1', 'cb_over_mean_2', 'hedge_rate_2'])
+setting_data.loc[0] = [init_fund, start_date, end_date, fut_code, fut_multiplier, margin_rate, cb_over_mean_1, hedge_rate_1, cb_over_mean_2, hedge_rate_2]
 
 # 计算股指期货季连年华升贴水率
 def calculate_fut_diff_rate_dict():
@@ -206,11 +101,12 @@ def calculate_fut_diff_rate_dict():
 # 根据可转债发行规模定制不同可转债的开平仓条件
 def calculate_limit_by_issue_size():
     print('根据可转债规模定制开平仓规则...')
-    global yield_to_maturity_dict
-    global close_level_dict
+    global buy_cb_over_dict
+    global sell_cb_over_dict
     global issue_size_code_set_1
     global issue_size_code_set_2
     global issue_size_code_set_3
+    global issue_size_code_set_4
     sql = "select ts_code, issue_size from bond.cb_basic"
     issue_df = read_postgre_data(sql)
     
@@ -222,17 +118,21 @@ def calculate_limit_by_issue_size():
         issue_size = issue_df.loc[i]['issue_size']
         bond_daily_md_df.loc[bond_daily_md_df.ts_code == code, 'issue_size'] = issue_size
         if issue_size <= issue_size_level_1:
-            yield_to_maturity_dict[code] = yield_to_maturity_level_1
-            close_level_dict[code] = close_level_1
+            buy_cb_over_dict[code] = buy_cb_over_level_1
+            sell_cb_over_dict[code] = sell_cb_over_level_1
             issue_size_code_set_1.add(code)
         elif issue_size > issue_size_level_1 and issue_size <= issue_size_level_2:
-            yield_to_maturity_dict[code] = yield_to_maturity_level_2
-            close_level_dict[code] = close_level_2
+            buy_cb_over_dict[code] = buy_cb_over_level_2
+            sell_cb_over_dict[code] = sell_cb_over_level_2
             issue_size_code_set_2.add(code)
-        else:
-            yield_to_maturity_dict[code] = yield_to_maturity_level_3
-            close_level_dict[code] = close_level_3
+        elif issue_size > issue_size_level_2 and issue_size <= issue_size_level_3:
+            buy_cb_over_dict[code] = buy_cb_over_level_3
+            sell_cb_over_dict[code] = sell_cb_over_level_3
             issue_size_code_set_3.add(code)
+        else:
+            buy_cb_over_dict[code] = buy_cb_over_level_4
+            sell_cb_over_dict[code] = sell_cb_over_level_4
+            issue_size_code_set_4.add(code)
 
 # 更具筛选条件获取指定交易日的代码列表，列表末位为股指期货合约
 def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
@@ -241,6 +141,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     sub_code_set_1 = set()
     sub_code_set_2 = set()
     sub_code_set_3 = set()
+    sub_code_set_4 = set()
     
     global bond_daily_md_df
     global fut_daily_md_df
@@ -251,30 +152,33 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     
     for i in range(1, len(position_df)):
         code = position_df.loc[i]['ts_code']
+        code_df = bond_md_df[bond_md_df.ts_code == code].copy()
+        code_df.reset_index(drop=True, inplace=True)
         now_code_df = now_bond_md_df[now_bond_md_df.ts_code == code].copy()
         now_code_df.reset_index(drop=True, inplace=True)
         next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
         next_code_df.reset_index(drop=True, inplace=True)
         highest_price = highest_price_dict[code]
-        price = round(now_code_df.loc[0]['amount'] * 1000 / now_code_df.loc[0]['vol'], 2)
+        close = code_df.loc[0]['close']
+        cb_over_rate = code_df.loc[0]['cb_over_rate']
         if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
-        price > close_level_dict[code] or (highest_price - price) / highest_price > 0.1:
+        cb_over_rate > sell_cb_over_dict[code] or (highest_price - close) / highest_price > max_drawdown:
             remove_code_set.add(code)
         else:
             if code in issue_size_code_set_1:
                 sub_code_set_1.add(code)
             elif code in issue_size_code_set_2:
                 sub_code_set_2.add(code)
-            else:
+            elif code in issue_size_code_set_3:
                 sub_code_set_3.add(code)
+            else:
+                sub_code_set_4.add(code)
     
-    bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_1) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
-                                (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_1) &
-                                (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size <= issue_size_level_1))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_1) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size <= issue_size_level_1))].copy()
     sub_code_list_1 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_1 | (set(sub_code_list_1) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
+        bond_code_df.sort_values(by='cb_over_rate', ascending=True, inplace=True)
         sub_code_list_1 = bond_code_df['ts_code'].tolist()
         for code in sub_code_list_1:
             if len(sub_code_set_1) >= max_len_of_single_code_set:
@@ -285,13 +189,11 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     else:
         sub_code_list_1 = list(union_set)
     
-    bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_2) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
-                                (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_2) &
-                                (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size > issue_size_level_1) & (bond_md_df.issue_size <= issue_size_level_2))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_2) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_1) & (bond_md_df.issue_size <= issue_size_level_2))].copy()
     sub_code_list_2 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_2 | (set(sub_code_list_2) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
+        bond_code_df.sort_values(by='cb_over_rate', ascending=True, inplace=True)
         sub_code_list_2 = bond_code_df['ts_code'].tolist()
         for code in sub_code_list_2:
             if len(sub_code_set_2) >= max_len_of_single_code_set:
@@ -301,14 +203,12 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         sub_code_list_2 = list(sub_code_set_2)
     else:
         sub_code_list_2 = list(union_set)
-        
-    bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_3) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
-                                (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_3) &
-                                (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size > issue_size_level_2))].copy()
+    
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_3) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_2) & (bond_md_df.issue_size <= issue_size_level_3))].copy()
     sub_code_list_3 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_3 | (set(sub_code_list_3) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
+        bond_code_df.sort_values(by='cb_over_rate', ascending=True, inplace=True)
         sub_code_list_3 = bond_code_df['ts_code'].tolist()
         for code in sub_code_list_3:
             if len(sub_code_set_3) >= max_len_of_single_code_set:
@@ -319,7 +219,23 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     else:
         sub_code_list_3 = list(union_set)
         
-    code_list = sub_code_list_1 + sub_code_list_2 + sub_code_list_3
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_4) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_3))].copy()
+    sub_code_list_4 = bond_code_df['ts_code'].tolist()
+    union_set = (sub_code_set_4 | (set(sub_code_list_4) - remove_code_set))
+    if len(union_set) > max_len_of_single_code_set:
+        bond_code_df.sort_values(by='cb_over_rate', ascending=True, inplace=True)
+        sub_code_list_4 = bond_code_df['ts_code'].tolist()
+        for code in sub_code_list_4:
+            if len(sub_code_set_4) >= max_len_of_single_code_set:
+                break
+            if code not in remove_code_set:
+                sub_code_set_4.add(code)
+        sub_code_list_4 = list(sub_code_set_4)
+    else:
+        sub_code_list_4 = list(union_set)
+    
+        
+    code_list = sub_code_list_1 + sub_code_list_2 + sub_code_list_3 + sub_code_list_4
     
     # 排除当前以及下一个交易日已经到期或无交易量的代码，以及当日收益率不满足要求和黑名单中的代码
     for i in range(0, len(code_list)):
@@ -330,8 +246,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         now_code_df.reset_index(drop=True, inplace=True)
         next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
         next_code_df.reset_index(drop=True, inplace=True)
-        if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
-            now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
+        if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or code in black_list:
             remove_code_set.add(code)
     code_list = list(set(code_list) - remove_code_set)
     
@@ -444,8 +359,8 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     #     hedge_rate += hedge_rate_diff_1 + (hedge_rate_diff_2 - hedge_rate_diff_1) * (fut_diff_rate - fut_diff_1) / (fut_diff_2 - fut_diff_1)
     
     # 按极值计算
-    if fut_diff_rate >= fut_diff_1:
-        hedge_rate += hedge_rate_diff_1
+    if fut_diff_rate >= 10:
+        hedge_rate -= 0.1
     
     global per_fund
     bond_fund = asset - available + per_fund * (len(code_list) - 1)
@@ -457,12 +372,6 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
         code_df = bond_md_df[bond_md_df.ts_code == code].copy()
         code_df.reset_index(drop=True, inplace=True)
         price = code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol']
-        # if code in issue_size_code_set_1:
-        #     vol = int(per_fund_1 / price)
-        # elif code in issue_size_code_set_2:
-        #     vol = int(per_fund_2 / price)
-        # else:
-        #     vol = int(per_fund_3 / price)
         vol = int(per_fund / price)
         vol -= vol % 10
         value_list = [vol, round(price, 2)]
@@ -545,14 +454,13 @@ def calculate_order_list(trade_date, position_dict, position_df):
         highest_price_dict[code] = price
     
     return order_list
-                
 
-# 策略主线程
 def main():
-    ret = read_config('./可转债-股指期货对冲回测框架设置-v5.xlsx')
-    if ret != 0:
-        print("设置读取错误，请检查设置文件！")
-        exit(1)
+    global black_list_dict
+    f = open('./backtest-frame/black-list.json', 'r', encoding='utf-8')
+    content = f.read()
+    black_list_dict = json.loads(content)
+    f.close()
     
     # 获取交易日历以及行情数据
     global cal_date_list
@@ -572,7 +480,7 @@ def main():
     
     # 根据可转债规模定制开平仓规则
     calculate_limit_by_issue_size()
-
+    
     # 设置初始资金
     set_init_fund(acct_id, cal_date_list[0], init_fund)
     
@@ -620,7 +528,7 @@ def main():
             # 根据交易指令列表向柜台发出交易指令，更新【成交数据】，【资金数据】
             for order in order_list:
                 place_order(acct_id, trade_date, order)
-        
+                
         # 更新账户资金数据
         CurrentFund['trade_date'] = trade_date
         last_fund = get_fund_data(acct_id, last_trade_date)
@@ -633,13 +541,13 @@ def main():
         CurrentFund['close_profit'] = 0
         CurrentFund['position_profit'] = 0
         last_code_list = code_list
-
+    
     today = datetime.date.today()
     todayStr = today.strftime('%Y%m%d')
     timeStr = time.strftime('%H-%M-%S')
     if not os.path.exists('output/{}/'.format(todayStr)):
         os.makedirs('output/{}/'.format(todayStr))
-    book_name = './output/{}/{}-{}-转债轮换-{}股指期货对冲净值回测-{}.xlsx'.format(todayStr, start_date, end_date, fut_name, timeStr)
+    book_name = './output/{}/{}-{}-低溢价进攻选债-{}股指期货对冲净值回测-{}.xlsx'.format(todayStr, start_date, end_date, fut_name, timeStr)
     write_data_to_xlsx(book_name, setting_data)
 
 

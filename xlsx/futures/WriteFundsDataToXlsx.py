@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-05
+# @Last Modified time: 2024-03-07
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -311,7 +311,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
     # 以年为单位的数据组数
     cnt_of_year = 4
     # 成交量排名前几才会被计入数据
-    cnt_of_vol_sort = 10
+    cnt_of_vol_sort = 28
     
     # 获取最新交易日
     sql = "select distinct trade_date from fut_spread_daily where fut_code = '{}' order by trade_date desc limit 1".format(fut_code)
@@ -737,7 +737,7 @@ def write_all_spread_funds_to_xlsx():
                   ['RB', 'Mysteel螺纹社会库存'], ['FG', '浮法玻璃生产线库存（万吨）'], ['SP', '港口纸浆总库存'], ['SC', '国别库存-中国'],
                   ['CF', '棉花：商业库存：中国（周）'], ['SN', '中国分地区锡锭社会库存-总库存'], ['Y', '豆油库存_中国'], ['NI', '电解镍国内社会库存（吨）'],
                   ['EB', '华东苯乙烯周度港口库存'], ['SS', '库存-不锈钢库存-中国主要地区不锈钢库存-合计库存']]
-    # param_list = [['M', '豆粕库存_中国']]
+    # param_list = [['RB', 'Mysteel螺纹社会库存']]
     for i in param_list:
         write_spread_funds_to_xlsx(i[0], i[1])
 
