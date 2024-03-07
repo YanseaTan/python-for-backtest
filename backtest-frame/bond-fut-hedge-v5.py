@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-05
+# @Last Modified time: 2024-03-06
 
 import pandas as pd
 import xlwings as xw
@@ -60,15 +60,18 @@ fut_diff_rate_dict = {}
 # 测试参数
 issue_size_level_1 = 500000000
 issue_size_level_2 = 1000000000
-close_level_1 = 130
-close_level_2 = 125
-close_level_3 = 120
-yield_to_maturity_level_1 = 0.5
-yield_to_maturity_level_2 = 1.5
-yield_to_maturity_level_3 = 2
+close_level_1 = 135
+close_level_2 = 130
+close_level_3 = 125
+yield_to_maturity_level_1 = 1.5
+yield_to_maturity_level_2 = 2
+yield_to_maturity_level_3 = 2.5
 issue_size_code_set_1 = set()
 issue_size_code_set_2 = set()
 issue_size_code_set_3 = set()
+per_fund_1 = 400000
+per_fund_2 = 500000
+per_fund_3 = 600000
 max_len_of_single_code_set = 70
 yield_to_maturity_dict = {}
 close_level_dict = {}
@@ -233,51 +236,92 @@ def calculate_limit_by_issue_size():
 
 # 更具筛选条件获取指定交易日的代码列表，列表末位为股指期货合约
 def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
+    if trade_date == '20240226':
+        x=1
     code_list = []
+    remove_code_set = set()
+    sub_code_set_1 = set()
+    sub_code_set_2 = set()
+    sub_code_set_3 = set()
     
     global bond_daily_md_df
     global fut_daily_md_df
     bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == last_trade_date)].copy()
+    now_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
+    next_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == next_trade_date)].copy()
     fut_md_df = fut_daily_md_df[(fut_daily_md_df.trade_date == last_trade_date)].copy()
+    
+    for i in range(1, len(position_df)):
+        code = position_df.loc[i]['ts_code']
+        now_code_df = now_bond_md_df[now_bond_md_df.ts_code == code].copy()
+        now_code_df.reset_index(drop=True, inplace=True)
+        next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
+        next_code_df.reset_index(drop=True, inplace=True)
+        highest_price = highest_price_dict[code]
+        close = now_code_df.loc[0]['close']
+        if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
+        close > close_level_dict[code] or (highest_price - close) / highest_price > 0.1:
+            remove_code_set.add(code)
+        else:
+            if code in issue_size_code_set_1:
+                sub_code_set_1.add(code)
+            elif code in issue_size_code_set_2:
+                sub_code_set_2.add(code)
+            else:
+                sub_code_set_3.add(code)
     
     bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_1) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
                                 (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_1) &
                                 (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size <= issue_size_level_1))].copy()
     sub_code_list_1 = bond_code_df['ts_code'].tolist()
-    if len(bond_code_df) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=True, inplace=True)
+    union_set = (sub_code_set_1 | (set(sub_code_list_1) - remove_code_set))
+    if len(union_set) > max_len_of_single_code_set:
+        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
         sub_code_list_1 = bond_code_df['ts_code'].tolist()
-        sub_code_list_1 = sub_code_list_1[:max_len_of_single_code_set]
-    code_list += sub_code_list_1
+        for code in sub_code_list_1:
+            if len(sub_code_set_1) >= max_len_of_single_code_set:
+                break
+            if code not in remove_code_set:
+                sub_code_set_1.add(code)
+        sub_code_list_1 = list(sub_code_set_1)
+    else:
+        sub_code_list_1 = list(union_set)
     
     bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_2) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
                                 (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_2) &
                                 (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size > issue_size_level_1) & (bond_md_df.issue_size <= issue_size_level_2))].copy()
     sub_code_list_2 = bond_code_df['ts_code'].tolist()
-    if len(bond_code_df) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=True, inplace=True)
+    union_set = (sub_code_set_2 | (set(sub_code_list_2) - remove_code_set))
+    if len(union_set) > max_len_of_single_code_set:
+        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
         sub_code_list_2 = bond_code_df['ts_code'].tolist()
-        sub_code_list_2 = sub_code_list_2[:max_len_of_single_code_set]
-    code_list += sub_code_list_2
-    
+        for code in sub_code_list_2:
+            if len(sub_code_set_2) >= max_len_of_single_code_set:
+                break
+            if code not in remove_code_set:
+                sub_code_set_2.add(code)
+        sub_code_list_2 = list(sub_code_set_2)
+    else:
+        sub_code_list_2 = list(union_set)
+        
     bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= yield_to_maturity_level_3) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
                                 (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) & (bond_md_df.close <= close_level_3) &
                                 (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high) & (bond_md_df.issue_size > issue_size_level_2))].copy()
     sub_code_list_3 = bond_code_df['ts_code'].tolist()
-    if len(bond_code_df) > max_len_of_single_code_set:
-        bond_code_df.sort_values(by='yield_to_maturity', ascending=True, inplace=True)
+    union_set = (sub_code_set_3 | (set(sub_code_list_3) - remove_code_set))
+    if len(union_set) > max_len_of_single_code_set:
+        bond_code_df.sort_values(by='yield_to_maturity', ascending=False, inplace=True)
         sub_code_list_3 = bond_code_df['ts_code'].tolist()
-        sub_code_list_3 = sub_code_list_3[:max_len_of_single_code_set]
-    code_list += sub_code_list_3
-    
-    # bond_code_df = bond_md_df[((bond_md_df.yield_to_maturity >= filter_yield_low) & (bond_md_df.yield_to_maturity <= filter_yield_high) &
-    #                             (bond_md_df.close >= filter_close_low) & (bond_md_df.close <= filter_close_high) &
-    #                             (bond_md_df.vol >= filter_vol_low) & (bond_md_df.vol <= filter_vol_high))]
-    # code_list = bond_code_df['ts_code'].tolist()
+        for code in sub_code_list_3:
+            if len(sub_code_set_3) >= max_len_of_single_code_set:
+                break
+            if code not in remove_code_set:
+                sub_code_set_3.add(code)
+        sub_code_list_3 = list(sub_code_set_3)
+    else:
+        sub_code_list_3 = list(union_set)
         
-    # 检查合约代码在当前以及下一个交易日是否存在交易
-    now_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
-    next_bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == next_trade_date)].copy()
+    code_list = sub_code_list_1 + sub_code_list_2 + sub_code_list_3
     
     # 排除当前以及下一个交易日已经到期或无交易量的代码，以及当日收益率不满足要求和黑名单中的代码
     for i in range(0, len(code_list)):
@@ -290,36 +334,8 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
         next_code_df.reset_index(drop=True, inplace=True)
         if len(now_code_df) == 0 or now_code_df.loc[0]['vol'] == 0 or len(next_code_df) == 0 or next_code_df.loc[0]['vol'] == 0 or\
             now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
-            code_list.remove(code)
-            
-    # 入池后今日也没筛出来，但尚未满足平仓条件且距离最高位还没有跌破 10%，那么不进行平仓
-    for i in range(1, len(position_df)):
-        code = position_df.loc[i]['ts_code']
-        if code not in code_list:
-            now_code_df = now_bond_md_df[now_bond_md_df.ts_code == code].copy()
-            now_code_df.reset_index(drop=True, inplace=True)
-            next_code_df = next_bond_md_df[next_bond_md_df.ts_code == code].copy()
-            next_code_df.reset_index(drop=True, inplace=True)
-            highest_price = highest_price_dict[code]
-            close = now_code_df.loc[0]['close']
-            if len(now_code_df) != 0 and now_code_df.loc[0]['vol'] != 0 and len(next_code_df) != 0 and next_code_df.loc[0]['vol'] != 0 and\
-                close < close_level_dict[code] and (highest_price - close) / highest_price < 0.1:
-                    if code in issue_size_code_set_1:
-                        sub_code_list_1.insert(0, code)
-                        if len(sub_code_list_1) > max_len_of_single_code_set:
-                            sub_code_list_1.pop()
-                    elif code in issue_size_code_set_2:
-                        sub_code_list_2.insert(0, code)
-                        if len(sub_code_list_2) > max_len_of_single_code_set:
-                            sub_code_list_2.pop()
-                    else:
-                        sub_code_list_3.insert(0, code)
-                        if len(sub_code_list_3) > max_len_of_single_code_set:
-                            sub_code_list_3.pop()
-            if (highest_price - close) / highest_price >= 0.1:
-                print('{} 在交易日 {} 距最高收盘价跌幅已超过 10%，已移出持仓'.format(code, trade_date))
-    
-    code_list = sub_code_list_1 + sub_code_list_2 + sub_code_list_3
+            remove_code_set.add(code)
+    code_list = list(set(code_list) - remove_code_set)
     
     # 筛选股指期货
     fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
@@ -443,6 +459,12 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
         code_df = bond_md_df[bond_md_df.ts_code == code].copy()
         code_df.reset_index(drop=True, inplace=True)
         price = code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol']
+        # if code in issue_size_code_set_1:
+        #     vol = int(per_fund_1 / price)
+        # elif code in issue_size_code_set_2:
+        #     vol = int(per_fund_2 / price)
+        # else:
+        #     vol = int(per_fund_3 / price)
         vol = int(per_fund / price)
         vol -= vol % 10
         value_list = [vol, round(price, 2)]

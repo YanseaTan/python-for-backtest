@@ -2,15 +2,11 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-01
+# @Last Modified time: 2024-03-06
 
 import pandas as pd
 import xlwings as xw
-import datetime
-import time
-import os
-from copy import deepcopy
-from sqlalchemy import column, create_engine
+from sqlalchemy import create_engine
 
 OPEN_CLOSE_NONE = 0
 OPEN_CLOSE_OPEN = 1
