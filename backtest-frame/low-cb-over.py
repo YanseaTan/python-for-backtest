@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-07
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-07
+# @Last Modified time: 2024-03-08
 
 import pandas as pd
 import xlwings as xw
@@ -19,6 +19,7 @@ init_fund = 20000000
 start_date = '20190101'
 end_date = '20240229'
 per_fund = 150000
+max_buy_price = 190
 
 black_list_dict = {}
 black_list = []
@@ -49,8 +50,8 @@ max_len_of_single_code_set = 50
 highest_price_dict = {}
 max_drawdown = 0.15
 
-setting_data = pd.DataFrame(columns=['init_fund', 'start_date', 'end_date'])
-setting_data.loc[0] = [init_fund, start_date, end_date]
+setting_data = pd.DataFrame(columns=['init_fund', 'start_date', 'end_date', 'max_buy_price'])
+setting_data.loc[0] = [init_fund, start_date, end_date, max_buy_price]
 
 # 根据可转债发行规模定制不同可转债的开平仓条件
 def calculate_limit_by_issue_size():
@@ -126,7 +127,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
             else:
                 sub_code_set_4.add(code)
     
-    bond_code_df = bond_md_df[((bond_md_df.cb_over_rate <= buy_cb_over_level_1) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size <= issue_size_level_1))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_1) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size <= issue_size_level_1))].copy()
     sub_code_list_1 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_1 | (set(sub_code_list_1) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
@@ -141,7 +142,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     else:
         sub_code_list_1 = list(union_set)
     
-    bond_code_df = bond_md_df[((bond_md_df.cb_over_rate <= buy_cb_over_level_2) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_1) & (bond_md_df.issue_size <= issue_size_level_2))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_2) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_1) & (bond_md_df.issue_size <= issue_size_level_2))].copy()
     sub_code_list_2 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_2 | (set(sub_code_list_2) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
@@ -156,7 +157,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     else:
         sub_code_list_2 = list(union_set)
     
-    bond_code_df = bond_md_df[((bond_md_df.cb_over_rate <= buy_cb_over_level_3) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_2) & (bond_md_df.issue_size <= issue_size_level_3))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_3) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_2) & (bond_md_df.issue_size <= issue_size_level_3))].copy()
     sub_code_list_3 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_3 | (set(sub_code_list_3) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:
@@ -171,7 +172,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
     else:
         sub_code_list_3 = list(union_set)
         
-    bond_code_df = bond_md_df[((bond_md_df.cb_over_rate <= buy_cb_over_level_4) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_3))].copy()
+    bond_code_df = bond_md_df[((bond_md_df.close <= max_buy_price) & (bond_md_df.cb_over_rate <= buy_cb_over_level_4) & (bond_md_df.vol >= 0) & (bond_md_df.issue_size > issue_size_level_3))].copy()
     sub_code_list_4 = bond_code_df['ts_code'].tolist()
     union_set = (sub_code_set_4 | (set(sub_code_list_4) - remove_code_set))
     if len(union_set) > max_len_of_single_code_set:

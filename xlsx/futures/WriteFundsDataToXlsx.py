@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-12-14
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-07
+# @Last Modified time: 2024-03-08
 
 from sqlalchemy import create_engine
 import xlwings as xw
@@ -311,7 +311,7 @@ def write_spread_funds_to_xlsx(fut_code, index_name):
     # 以年为单位的数据组数
     cnt_of_year = 4
     # 成交量排名前几才会被计入数据
-    cnt_of_vol_sort = 28
+    cnt_of_vol_sort = 10
     
     # 获取最新交易日
     sql = "select distinct trade_date from fut_spread_daily where fut_code = '{}' order by trade_date desc limit 1".format(fut_code)

@@ -58,13 +58,13 @@ issue_size_code_set_1 = set()
 issue_size_code_set_2 = set()
 issue_size_code_set_3 = set()
 issue_size_code_set_4 = set()
-max_buy_price = 130
+max_buy_price = 150
 max_len_of_single_code_set = 50
 highest_price_dict = {}
 max_drawdown = 0.15
 
-setting_data = pd.DataFrame(columns=['init_fund', 'start_date', 'end_date', 'fut_code', 'fut_multiplier', 'margin_rate', 'cb_over_mean_1', 'hedge_rate_1', 'cb_over_mean_2', 'hedge_rate_2'])
-setting_data.loc[0] = [init_fund, start_date, end_date, fut_code, fut_multiplier, margin_rate, cb_over_mean_1, hedge_rate_1, cb_over_mean_2, hedge_rate_2]
+setting_data = pd.DataFrame(columns=['init_fund', 'start_date', 'end_date', 'max_buy_price', 'fut_code', 'fut_multiplier', 'margin_rate', 'cb_over_mean_1', 'hedge_rate_1', 'cb_over_mean_2', 'hedge_rate_2'])
+setting_data.loc[0] = [init_fund, start_date, end_date, max_buy_price, fut_code, fut_multiplier, margin_rate, cb_over_mean_1, hedge_rate_1, cb_over_mean_2, hedge_rate_2]
 
 # 计算股指期货季连年华升贴水率
 def calculate_fut_diff_rate_dict():

@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-06
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-07
+# @Last Modified time: 2024-03-08
 
 import pandas as pd
 import xlwings as xw
@@ -14,8 +14,8 @@ import sys
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 
-start_date = '20220331'
-end_date = '20220816'
+start_date = '20200331'
+end_date = '20200815'
 fut_code = 'V'
 fut_multiplier = 5
 margin_rate = 0.2
@@ -43,7 +43,7 @@ def main():
     # 第一天设置初始资金
     set_init_fund(acct_id, first_day, init_fund)
     
-    # 第二天进行交易
+    # 第二天进行交易，保证金只收一边
     md_df = first_md_df[first_md_df.trade_date == second_day].copy()
     md_df.reset_index(drop=True, inplace=True)
     first_ts_code = md_df.loc[0]['ts_code']
@@ -58,7 +58,6 @@ def main():
     price = md_df.loc[0]['close']
     place_order(acct_id, second_day, [second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, price, 0])
     add_position_data(acct_id, second_day, second_ts_code, vol, DIRECTION_SELL, price, 0)
-    CurrentFund['available'] -= vol * fut_multiplier * price * margin_rate
     
     CurrentFund['trade_date'] = second_day
     add_fund_data(list(CurrentFund.values()))
@@ -80,6 +79,7 @@ def main():
         position_profit = round((price - open_price) * vol * fut_multiplier, 2)
         add_position_data(acct_id, trade_date, first_ts_code, vol, DIRECTION_BUY, open_price, position_profit)
         CurrentFund['position_profit'] += position_profit
+        CurrentFund['available'] = init_fund - vol * fut_multiplier * price * margin_rate
         
         open_price = position_df.loc[1]['open_price']
         md_df = second_md_df[second_md_df.trade_date == trade_date].copy()

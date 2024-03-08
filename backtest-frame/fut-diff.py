@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-01
+# @Last Modified time: 2024-03-08
 
 import pandas as pd
 import xlwings as xw
@@ -252,6 +252,60 @@ def correlation_analysis():
     df = pd.read_excel('C:/Users/yanse/Desktop/相关性分析.xlsx', names=['worth', 'fut_diff', 'IC', 'mean_yield', 'mean_close', 'mean_cb_over_rate', 'hedge_rate', 'fix_hedge_rate'])
     sns.pairplot(data=df)
     plt.show()
+    
+# 净值分析
+def analyze_worth_result(book_name, column):
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.open(book_name)
+    ws = wb.sheets['综合']
+    rng = ws.range('B1').expand()
+    nrows = rng.rows.count
+    strloc = column + '2:' + column + str(nrows)
+    date_list = ws.range(strloc).value
+    column = chr(ord(column) + 1)
+    strloc = column + '2:' + column + str(nrows)
+    asset_list = ws.range(strloc).value
+    new_date_list = ['日期']
+    worth_list = ['净值']
+    mini_worth = 1
+    worth_dict = {}
+    year = ''
+    init_fund = asset_list[0]
+    for i in range(0, len(date_list)):
+        asset = asset_list[i]
+        worth = round(asset / init_fund, 4)
+        worth_list.append(worth)
+        mini_worth = min(mini_worth, worth)
+        
+        date = date_list[i]
+        date = date[:4] + '/' + date[4:6] + '/' + date[6:8]
+        new_date_list.append(date)
+        
+        if year != date[:4]:
+            year = date[:4]
+            worth_dict[year] = [1]
+            tmp_init_fund = asset
+        else:
+            tmp_worth = round(asset / tmp_init_fund, 4)
+            worth_dict[year].append(tmp_worth)
+    
+    result_list = [['组别', '最大回撤', '最终收益', '风险收益比', '年化收益']]
+    one_result_list = get_result_list(worth_list[1:], '总体')
+    result_list.append(one_result_list)
+    for year, year_worth_list in worth_dict.items():
+        one_result_list = get_result_list(year_worth_list, year)
+        result_list.append(one_result_list)
+    
+    column = chr(ord(column) + 5)
+    ws.range('{}1'.format(column)).value = result_list
+    rng = ws.range('{}1'.format(column)).expand()
+    for i in range(0, 5):
+        rng.columns[i][0].color = (200, 255, 200)
+    
+    ws.autofit()
+    wb.save()
+    wb.close()
+    app.quit()
 
 def main():
     # write_fut_diff_to_xlsx('20190101', '20240229', 'IC')
@@ -259,7 +313,8 @@ def main():
     # write_mean_yield_to_maturity_to_xlsx('20190101', '20240228')
     # write_mean_cb_over_rate_to_xlsx('20190101', '20240228')
     # write_mean_close_to_xlsx('20190101', '20240228')
-    correlation_analysis()
+    # correlation_analysis()
+    analyze_worth_result('C:/Users/yanse/Desktop/综合.xlsx', 'C')
         
 if __name__ == "__main__":
     main()
