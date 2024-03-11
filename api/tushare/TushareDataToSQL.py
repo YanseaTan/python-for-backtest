@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-01
+# @Last Modified time: 2024-03-11
 
 import time
 import datetime
@@ -259,9 +259,95 @@ def update_daily_data():
         update_fut_warehouse_data(trade_date)
         update_fut_warehouse_data_sum(trade_date)
 
+def bond_daily_md_proc(start_date, end_date, ts_code):
+    remain_size_df = pro.cb_share(**{"ts_code": ts_code}, fields=["ts_code","end_date","remain_size"])
+    
+    sql = "select issue_size, stk_code from bond.cb_basic where ts_code = '{}'".format(ts_code)
+    cb_basic_df = read_postgre_data(sql)
+    issue_size = cb_basic_df.loc[0]['issue_size']
+    stk_code = cb_basic_df.loc[0]['stk_code']
+    
+    sql = "SELECT ts_code, trade_date, open, high, low, close, change, pct_chg, vol, amount FROM bond.cb_daily\
+        WHERE ts_code = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(ts_code, start_date, end_date)
+    cb_md_df = read_postgre_data(sql)
+    cb_md_df.insert(1, 'stk_code', stk_code)
+    cb_md_df.insert(len(cb_md_df.columns), 'remain_size', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'turn_over', 0)
+    
+    for i in range(0, len(cb_md_df)):
+        trade_date = cb_md_df.loc[i]['trade_date']
+        vol = cb_md_df.loc[i]['vol']
+        trade_date_format = trade_date[:4] + '-' + trade_date[4:6] + '-' + trade_date[6:8]
+        current_remain_size_df = remain_size_df[remain_size_df.end_date <= trade_date_format].copy()
+        current_remain_size_df.sort_values(by='end_date', ascending=False, inplace=True)
+        current_remain_size_df.reset_index(drop=True, inplace=True)
+        if len(current_remain_size_df) == 0:
+            remain_size = issue_size
+        else:
+            remain_size = current_remain_size_df.loc[0]['remain_size']
+        cb_md_df.loc[cb_md_df.trade_date == trade_date, 'remain_size'] = remain_size
+        turn_over = vol * 10000 / remain_size
+        cb_md_df.loc[cb_md_df.trade_date == trade_date, 'turn_over'] = turn_over
+    
+    stk_md_df = pro.bak_daily(**{"ts_code": stk_code,"start_date": start_date,"end_date": end_date},
+                       fields=["ts_code","trade_date","open","high","low","close","change","pct_change","vol","amount","turn_over"])
+    
+    print(cb_md_df)
+    print(stk_md_df)
+    write_data('cb_md', 'bond', cb_md_df)
+    write_data('stk_md', 'bond', stk_md_df)
+        
+def write_bond_daily_md_to_csv(ts_code):
+    sql = "select * from bond.cb_md where ts_code = '{}' order by trade_date".format(ts_code)
+    cb_md_df = read_postgre_data(sql)
+    cb_md_df.columns = ['ts_code','stk_code','trade_date','cb_open','cb_high','cb_low','cb_close','cb_change','cb_pct_chg','cb_vol','cb_amount','cb_remain_size','cb_turn_over']
+    stk_code = cb_md_df.loc[0]['stk_code']
+    
+    sql = "select * from bond.stk_md where ts_code = '{}'".format(stk_code)
+    stk_md_df = read_postgre_data(sql)
+    
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_open', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_high', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_low', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_close', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_change', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_pct_chg', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_vol', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_amount', 0)
+    cb_md_df.insert(len(cb_md_df.columns), 'stk_turn_over', 0)
+    for i in range(0, len(cb_md_df)):
+        trade_date = cb_md_df.loc[i]['trade_date']
+        stk_data_df = stk_md_df[stk_md_df.trade_date == trade_date].copy()
+        stk_data_df.reset_index(drop=True, inplace=True)
+        cb_md_df.loc[i, 'stk_open'] = stk_data_df.loc[0]['open']
+        cb_md_df.loc[i, 'stk_high'] = stk_data_df.loc[0]['high']
+        cb_md_df.loc[i, 'stk_low'] = stk_data_df.loc[0]['low']
+        cb_md_df.loc[i, 'stk_close'] = stk_data_df.loc[0]['close']
+        cb_md_df.loc[i, 'stk_change'] = stk_data_df.loc[0]['change']
+        cb_md_df.loc[i, 'stk_pct_chg'] = stk_data_df.loc[0]['pct_change']
+        cb_md_df.loc[i, 'stk_vol'] = stk_data_df.loc[0]['vol']
+        cb_md_df.loc[i, 'stk_amount'] = stk_data_df.loc[0]['amount']
+        cb_md_df.loc[i, 'stk_turn_over'] = stk_data_df.loc[0]['turn_over']
+    
+    cb_md_df.to_csv("./temp/{}.csv".format(ts_code), index=False)
+
 if __name__ == '__main__':
     # 登录 Tushare 接口
     pro = ts.pro_api(token)
     
-    update_daily_data()
+    # update_daily_data()
     # get_all_fut_cal_date()
+    
+    # start_date = '20220101'
+    # end_date = '20240308'
+    # bond_list = ['127056.SZ', '123218.SZ', '123025.SZ', '127033.SZ', '123205.SZ', '113052.SH',
+    #              '123018.SZ', '110044.SH', '128041.SZ', '113044.SH', '123230.SZ', '113678.SH',
+    #              '127081.SZ', '127098.SZ', '113594.SH', '113672.SH']
+    # for ts_code in bond_list:
+    #     bond_daily_md_proc(start_date, end_date, ts_code)
+    
+    bond_list = ['127056.SZ', '123218.SZ', '123025.SZ', '127033.SZ', '123205.SZ', '113052.SH',
+                 '123018.SZ', '110044.SH', '128041.SZ', '113044.SH', '123230.SZ', '113678.SH',
+                 '127081.SZ', '127098.SZ', '113594.SH', '113672.SH']
+    for ts_code in bond_list:
+        write_bond_daily_md_to_csv(ts_code)
