@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-06
+# @Last Modified time: 2024-03-12
 
 import pandas as pd
 import xlwings as xw
@@ -152,14 +152,15 @@ def write_data_to_xlsx(book_name, setting_data):
     print('写入基础数据...')
     init_fund = FundData.loc[0]['asset']
     FundData.columns = ['账户ID', '交易日', '可用资金', '总资金', '平仓盈亏', '持仓盈亏']
-    TradeData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
-    TradeData['open_close'].replace([0, 1, 2], ['/', '开', '平'], inplace=True)
-    TradeData.columns = ['账户ID', '交易日', '合约代码', '成交数量', '方向', '开平', '价格', '平仓盈亏']
+    TradeData_copy = TradeData.copy()
+    TradeData_copy['direction'].replace([0, 1], ['买', '卖'], inplace=True)
+    TradeData_copy['open_close'].replace([0, 1, 2], ['/', '开', '平'], inplace=True)
+    TradeData_copy.columns = ['账户ID', '交易日', '合约代码', '成交数量', '方向', '开平', '价格', '平仓盈亏']
     PositionData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
     PositionData.columns = ['账户ID', '交易日', '合约代码', '持仓数量', '方向', '开仓均价', '持仓盈亏']
     with pd.ExcelWriter(book_name) as writer:
         FundData.to_excel(writer, sheet_name='资金数据', index=False)
-        TradeData.to_excel(writer, sheet_name='成交数据', index=False)
+        TradeData_copy.to_excel(writer, sheet_name='成交数据', index=False)
         PositionData.to_excel(writer, sheet_name='持仓数据', index=False)
         setting_data.to_excel(writer, sheet_name='参数设置', index=False)
     
@@ -174,6 +175,7 @@ def write_data_to_xlsx(book_name, setting_data):
     new_date_list = ['日期']
     worth_list = ['净值']
     mini_worth = 1
+    max_worth = 1
     worth_dict = {}
     year = ''
     for i in range(0, len(date_list)):
@@ -181,6 +183,7 @@ def write_data_to_xlsx(book_name, setting_data):
         worth = round(asset / init_fund, 4)
         worth_list.append(worth)
         mini_worth = min(mini_worth, worth)
+        max_worth = max(max_worth, worth)
         
         date = date_list[i]
         date = date[:4] + '/' + date[4:6] + '/' + date[6:8]
@@ -232,7 +235,7 @@ def write_data_to_xlsx(book_name, setting_data):
     chart.api[1].ChartTitle.Text = "净值曲线"     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
     chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
-    chart.api[1].Axes(2).MajorUnit = 0.08      # 纵坐标单位值
+    chart.api[1].Axes(2).MajorUnit = (max_worth - mini_worth) / 10      # 纵坐标单位值
     chart.api[1].Axes(1).MajorUnit = int(len(worth_list) / 8)      # 横坐标单位值
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
@@ -244,5 +247,77 @@ def write_data_to_xlsx(book_name, setting_data):
     wb.save(book_name)
     wb.close()
     app.quit()
+
+# 输出多空盈亏情况
+def write_profit_to_xlsx(book_name):
+    last_trade_date = TradeData.loc[0]['trade_date']
+    date_list = ['日期']
+    cb_profit_list = ['多头平仓盈亏']
+    fut_profit_list = ['空头平仓盈亏']
+    cb_profit = 0
+    fut_profit = 0
+    for i in range(0, len(TradeData)):
+        direction = TradeData.loc[i]['direction']
+        open_close = TradeData.loc[i]['open_close']
+        if (direction == DIRECTION_BUY and open_close == OPEN_CLOSE_NONE) or (direction == DIRECTION_SELL and open_close == OPEN_CLOSE_OPEN):
+            continue
+        trade_date = TradeData.loc[i]['trade_date']
+        if trade_date != last_trade_date:
+            last_trade_date = last_trade_date[:4] + '/' + last_trade_date[4:6] + '/' + last_trade_date[6:8]
+            date_list.append(last_trade_date)
+            cb_profit_list.append(cb_profit)
+            fut_profit_list.append(fut_profit)
+            cb_profit = 0
+            fut_profit = 0
+            last_trade_date = trade_date
+        close_profit = TradeData.loc[i]['close_profit']
+        if open_close == OPEN_CLOSE_NONE:
+            cb_profit += close_profit
+        else:
+            fut_profit += close_profit
+    last_trade_date = trade_date
+    last_trade_date = last_trade_date[:4] + '/' + last_trade_date[4:6] + '/' + last_trade_date[6:8]
+    date_list.append(last_trade_date)
+    cb_profit_list.append(cb_profit)
+    fut_profit_list.append(fut_profit)
     
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.open(book_name)
+    ws = wb.sheets['成交数据']
+        
+    ws.range('I1').options(transpose=True).value = date_list
+    ws.range('J1').options(transpose=True).value = cb_profit_list
+    ws.range('K1').options(transpose=True).value = fut_profit_list
+    ws.autofit()
+    
+    # 插入净值曲线
+    print("向 Excel 插入曲线...")
+    cnt_of_date = len(date_list)
+    chart = ws.charts.add(20, 120, 800, 400)
+    chart.set_source_data(ws.range((1,9),(cnt_of_date,11)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = "净值曲线"     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    # chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
+    # chart.api[1].Axes(2).MajorUnit = (max_worth - mini_worth) / 10      # 纵坐标单位值
+    chart.api[1].Axes(1).MajorUnit = int(len(date_list) / 8)      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
+    # chart.api[1].Axes(2).CrossesAt = mini_worth - 0.02
+    # chart.api[1].Axes(2).MinimumScale = mini_worth - 0.02
+    chart.api[1].ChartStyle = 245       # 图表格式
+    
+    wb.save(book_name)
+    wb.close()
+    app.quit()
     

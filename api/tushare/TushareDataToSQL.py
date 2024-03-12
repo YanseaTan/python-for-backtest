@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-11
+# @Last Modified time: 2024-03-12
 
 import time
 import datetime
@@ -331,11 +331,17 @@ def write_bond_daily_md_to_csv(ts_code):
     
     cb_md_df.to_csv("./temp/{}.csv".format(ts_code), index=False)
 
+def read_csv_test():
+    reader = pd.read_csv("./temp/Level1MD20240308.csv", chunksize=5000)
+    for chunk in reader:
+        print(chunk)
+        chunk.to_sql('md_test', postgre_engine_ts, 'bond', index=False, if_exists='append', chunksize=5000)
+
 if __name__ == '__main__':
     # 登录 Tushare 接口
     pro = ts.pro_api(token)
     
-    # update_daily_data()
+    update_daily_data()
     # get_all_fut_cal_date()
     
     # start_date = '20220101'
@@ -346,8 +352,8 @@ if __name__ == '__main__':
     # for ts_code in bond_list:
     #     bond_daily_md_proc(start_date, end_date, ts_code)
     
-    bond_list = ['127056.SZ', '123218.SZ', '123025.SZ', '127033.SZ', '123205.SZ', '113052.SH',
-                 '123018.SZ', '110044.SH', '128041.SZ', '113044.SH', '123230.SZ', '113678.SH',
-                 '127081.SZ', '127098.SZ', '113594.SH', '113672.SH']
-    for ts_code in bond_list:
-        write_bond_daily_md_to_csv(ts_code)
+    # bond_list = ['127056.SZ', '123218.SZ', '123025.SZ', '127033.SZ', '123205.SZ', '113052.SH',
+    #              '123018.SZ', '110044.SH', '128041.SZ', '113044.SH', '123230.SZ', '113678.SH',
+    #              '127081.SZ', '127098.SZ', '113594.SH', '113672.SH']
+    # for ts_code in bond_list:
+    #     write_bond_daily_md_to_csv(ts_code)

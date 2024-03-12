@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-08
+# @Last Modified time: 2024-03-11
 
 import pandas as pd
 import xlwings as xw
@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from sqlalchemy import column, create_engine
 import sys
+
+from tools.DatabaseTools import write_data
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 

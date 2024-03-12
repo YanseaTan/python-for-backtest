@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-07
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-11
+# @Last Modified time: 2024-03-12
 
 import pandas as pd
 import xlwings as xw
@@ -43,7 +43,7 @@ fut_diff_rate_dict = {}
 # 测试参数
 buy_cb_over_level_1 = 15
 sell_cb_over_level_1 = 50
-max_buy_price = 9999999
+max_buy_price = 140
 max_len_of_single_code_set = 300
 highest_price_dict = {}
 max_drawdown = 0.15
@@ -439,6 +439,7 @@ def main():
         os.makedirs('output/{}/'.format(todayStr))
     book_name = './output/{}/{}-{}-简化低溢价进攻选债-{}股指期货对冲净值回测-{}.xlsx'.format(todayStr, start_date, end_date, fut_name, timeStr)
     write_data_to_xlsx(book_name, setting_data)
+    write_profit_to_xlsx(book_name)
 
 
 if __name__ == "__main__":
