@@ -126,6 +126,26 @@ def get_max_drawdown_sys(array):
     cumsum = array.cummax()
     return max(cumsum-array)
 
+def get_win_rate(year):
+    if year == '总体':
+        TradeData_copy = TradeData.copy()
+    else:
+        TradeData_copy = TradeData[TradeData.trade_date.str.contains(year)].copy()
+        TradeData_copy.reset_index(drop=True, inplace=True)
+    win = 0
+    loss = 0
+    for i in range(0, len(TradeData_copy)):
+        direction = TradeData_copy.loc[i]['direction']
+        open_close = TradeData_copy.loc[i]['open_close']
+        if direction == DIRECTION_BUY or open_close != OPEN_CLOSE_NONE:
+            continue
+        close_profit = TradeData_copy.loc[i]['close_profit']
+        if close_profit >= 0:
+            win += 1
+        else:
+            loss += 1
+    return round(win * 100 / (win + loss), 2)
+
 def get_result_list(worth_list, result_name):
     print("分析{}净值结果...".format(result_name))
     result_list = [result_name]
@@ -143,6 +163,8 @@ def get_result_list(worth_list, result_name):
             result_list.append('/')
     year_profit = round((pow(worth_list[len(worth_list) - 1], 250 / len(worth_list)) - 1) * 100, 2)
     result_list.append(str(year_profit) + '%')
+    win_rate = get_win_rate(result_name)
+    result_list.append(str(win_rate) + '%')
     print("分析{}净值结果完毕！".format(result_name))
     return result_list
 
@@ -156,12 +178,13 @@ def write_data_to_xlsx(book_name, setting_data):
     TradeData_copy['direction'].replace([0, 1], ['买', '卖'], inplace=True)
     TradeData_copy['open_close'].replace([0, 1, 2], ['/', '开', '平'], inplace=True)
     TradeData_copy.columns = ['账户ID', '交易日', '合约代码', '成交数量', '方向', '开平', '价格', '平仓盈亏']
-    PositionData['direction'].replace([0, 1], ['买', '卖'], inplace=True)
-    PositionData.columns = ['账户ID', '交易日', '合约代码', '持仓数量', '方向', '开仓均价', '持仓盈亏']
+    PositionData_copy = PositionData.copy()
+    PositionData_copy['direction'].replace([0, 1], ['买', '卖'], inplace=True)
+    PositionData_copy.columns = ['账户ID', '交易日', '合约代码', '持仓数量', '方向', '开仓均价', '持仓盈亏']
     with pd.ExcelWriter(book_name) as writer:
         FundData.to_excel(writer, sheet_name='资金数据', index=False)
         TradeData_copy.to_excel(writer, sheet_name='成交数据', index=False)
-        PositionData.to_excel(writer, sheet_name='持仓数据', index=False)
+        PositionData_copy.to_excel(writer, sheet_name='持仓数据', index=False)
         setting_data.to_excel(writer, sheet_name='参数设置', index=False)
     
     # 计算净值，分析收益，插入曲线
@@ -200,7 +223,7 @@ def write_data_to_xlsx(book_name, setting_data):
     ws.range('G1').options(transpose=True).value = new_date_list
     ws.range('H1').options(transpose=True).value = worth_list
     
-    result_list = [['组别', '最大回撤', '最终收益', '风险收益比', '年化收益']]
+    result_list = [['组别', '最大回撤', '最终收益', '风险收益比', '年化收益', '胜率']]
     one_result_list = get_result_list(worth_list[1:], '总体')
     result_list.append(one_result_list)
     for year, year_worth_list in worth_dict.items():
@@ -212,7 +235,7 @@ def write_data_to_xlsx(book_name, setting_data):
     for i in range(0, 8):
         rng.columns[i][0].color = (211, 211, 211)
     rng = ws.range('J1').expand()
-    for i in range(0, 5):
+    for i in range(0, 6):
         rng.columns[i][0].color = (200, 255, 200)
     
     ws.autofit()
@@ -248,8 +271,9 @@ def write_data_to_xlsx(book_name, setting_data):
     wb.close()
     app.quit()
 
-# 输出多空盈亏情况
-def write_profit_to_xlsx(book_name):
+# 输出多空平仓盈亏情况
+def write_close_profit_to_xlsx(book_name):
+    print('输出多空平仓盈亏情况...')
     last_trade_date = TradeData.loc[0]['trade_date']
     date_list = ['日期']
     cb_profit_list = ['多头平仓盈亏']
@@ -267,8 +291,6 @@ def write_profit_to_xlsx(book_name):
             date_list.append(last_trade_date)
             cb_profit_list.append(cb_profit)
             fut_profit_list.append(fut_profit)
-            cb_profit = 0
-            fut_profit = 0
             last_trade_date = trade_date
         close_profit = TradeData.loc[i]['close_profit']
         if open_close == OPEN_CLOSE_NONE:
@@ -305,11 +327,110 @@ def write_profit_to_xlsx(book_name):
     # chart.api[1].SetElement(334)      #x轴的网格线
     chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
     # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
-    chart.api[1].ChartTitle.Text = "净值曲线"     #改变标题文本
+    chart.api[1].ChartTitle.Text = "多空平仓盈亏曲线"     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
     # chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
     # chart.api[1].Axes(2).MajorUnit = (max_worth - mini_worth) / 10      # 纵坐标单位值
-    chart.api[1].Axes(1).MajorUnit = int(len(date_list) / 8)      # 横坐标单位值
+    chart.api[1].Axes(1).MajorUnit = int(len(date_list) / 2)      # 横坐标单位值
+    chart.api[1].Legend.Position = -4107    # 图例显示在下方
+    # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
+    chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
+    # chart.api[1].Axes(2).CrossesAt = mini_worth - 0.02
+    # chart.api[1].Axes(2).MinimumScale = mini_worth - 0.02
+    chart.api[1].ChartStyle = 245       # 图表格式
+    
+    wb.save(book_name)
+    wb.close()
+    app.quit()
+    
+# 输出多空总盈亏情况
+def write_total_profit_to_xlsx(book_name):
+    print('输出多空总盈亏情况...')
+    last_trade_date = PositionData.loc[0]['trade_date']
+    date_list = ['日期']
+    cb_profit_list = ['多头总盈亏']
+    fut_profit_list = ['空头总盈亏']
+    cb_profit = 0
+    fut_profit = 0
+    cb_close_profit = 0
+    fut_close_profit = 0
+    for i in range(0, len(PositionData)):
+        trade_date = PositionData.loc[i]['trade_date']
+        if trade_date != last_trade_date:
+            TradeData_oneday = TradeData[TradeData.trade_date == last_trade_date].copy()
+            if len(TradeData_oneday) != 0:
+                TradeData_oneday.reset_index(drop=True, inplace=True)
+                for j in range(0, len(TradeData_oneday)):
+                    direction = TradeData_oneday.loc[j]['direction']
+                    open_close = TradeData_oneday.loc[j]['open_close']
+                    if (direction == DIRECTION_BUY and open_close == OPEN_CLOSE_NONE) or (direction == DIRECTION_SELL and open_close == OPEN_CLOSE_OPEN):
+                        continue
+                    close_profit = TradeData_oneday.loc[j]['close_profit']
+                    if open_close == OPEN_CLOSE_NONE:
+                        cb_close_profit += close_profit
+                    else:
+                        fut_close_profit += close_profit
+            last_trade_date = last_trade_date[:4] + '/' + last_trade_date[4:6] + '/' + last_trade_date[6:8]
+            date_list.append(last_trade_date)
+            cb_profit_list.append(cb_profit + cb_close_profit)
+            fut_profit_list.append(fut_profit + fut_close_profit)
+            cb_profit = 0
+            fut_profit = 0
+            last_trade_date = trade_date
+        direction = PositionData.loc[i]['direction']
+        position_profit = PositionData.loc[i]['position_profit']
+        if direction == DIRECTION_BUY:
+            cb_profit += position_profit
+        else:
+            fut_profit += position_profit
+    last_trade_date = trade_date
+    TradeData_oneday = TradeData[TradeData.trade_date == last_trade_date].copy()
+    if len(TradeData_oneday) != 0:
+        TradeData_oneday.reset_index(drop=True, inplace=True)
+        for j in range(0, len(TradeData_oneday)):
+            direction = TradeData_oneday.loc[j]['direction']
+            open_close = TradeData_oneday.loc[j]['open_close']
+            if (direction == DIRECTION_BUY and open_close == OPEN_CLOSE_NONE) or (direction == DIRECTION_SELL and open_close == OPEN_CLOSE_OPEN):
+                continue
+            close_profit = TradeData_oneday.loc[j]['close_profit']
+            if open_close == OPEN_CLOSE_NONE:
+                cb_close_profit += close_profit
+            else:
+                fut_close_profit += close_profit
+    last_trade_date = last_trade_date[:4] + '/' + last_trade_date[4:6] + '/' + last_trade_date[6:8]
+    date_list.append(last_trade_date)
+    cb_profit_list.append(cb_profit + cb_close_profit)
+    fut_profit_list.append(fut_profit + fut_close_profit)
+    
+    app = xw.App(visible=True,add_book=False)
+    wb = app.books.open(book_name)
+    ws = wb.sheets['持仓数据']
+        
+    ws.range('H1').options(transpose=True).value = date_list
+    ws.range('I1').options(transpose=True).value = cb_profit_list
+    ws.range('J1').options(transpose=True).value = fut_profit_list
+    ws.autofit()
+    
+    # 插入净值曲线
+    print("向 Excel 插入曲线...")
+    cnt_of_date = len(date_list)
+    chart = ws.charts.add(20, 120, 800, 400)
+    chart.set_source_data(ws.range((1,8),(cnt_of_date,10)))
+    # Excel VBA 指令
+    chart.chart_type = 'xy_scatter_lines_no_markers'
+    chart.api[1].SetElement(2)          #显示标题
+    chart.api[1].SetElement(101)        #显示图例
+    chart.api[1].SetElement(301)        #x轴标题
+    # chart.api[1].SetElement(311)      #y轴标题
+    chart.api[1].SetElement(305)        #y轴的网格线
+    # chart.api[1].SetElement(334)      #x轴的网格线
+    chart.api[1].Axes(1).AxisTitle.Text = "日期"          #x轴标题的名字
+    # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
+    chart.api[1].ChartTitle.Text = "多空总盈亏曲线"     #改变标题文本
+    # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
+    # chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
+    # chart.api[1].Axes(2).MajorUnit = (max_worth - mini_worth) / 10      # 纵坐标单位值
+    chart.api[1].Axes(1).MajorUnit = int(len(date_list) / 2)      # 横坐标单位值
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示

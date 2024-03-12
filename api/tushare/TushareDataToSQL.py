@@ -357,3 +357,5 @@ if __name__ == '__main__':
     #              '127081.SZ', '127098.SZ', '113594.SH', '113672.SH']
     # for ts_code in bond_list:
     #     write_bond_daily_md_to_csv(ts_code)
+    
+    # read_csv_test()
