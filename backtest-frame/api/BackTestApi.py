@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-12
+# @Last Modified time: 2024-03-13
 
 import pandas as pd
 import xlwings as xw
@@ -105,21 +105,73 @@ def get_position_data(acct_id, trade_date = ''):
     else:
         return PositionData[((PositionData.acct_id == acct_id) & (PositionData.trade_date == trade_date))]
 
-# 进行下单操作，更新账户可用资金（忽略股指期货保证金占用）
-def place_order(acct_id, trade_date, order):
+# 进行下单操作，更新账户可用资金
+def place_order(acct_id, trade_date, order, position_df, fut_multiplier):
     ts_code = order[0]
     vol = order[1]
     direction = order[2]
     open_close = order[3]
     price = order[4]
-    close_profit = order[5]
-    add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
     
     if open_close == OPEN_CLOSE_NONE:
         if direction == DIRECTION_BUY:
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
             CurrentFund['available'] -= price * vol
         elif direction == DIRECTION_SELL:
+            close_profit = 0 # todo
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
             CurrentFund['available'] += price * vol
+    elif open_close == OPEN_CLOSE_OPEN:
+        position_record_df = position_df[(position_df.ts_code == ts_code) & (position_df.direction == direction)].copy()
+        if len(position_record_df) == 0:
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
+            add_position_data(acct_id, trade_date, ts_code, vol, direction, price, 0)
+        else:
+            position_record_df.reset_index(drop=True, inplace=True)
+            last_vol = position_record_df.loc[0]['vol']
+            last_price = position_record_df.loc[0]['open_price']
+            total_vol = last_vol + vol
+            open_price = round(((last_price * last_vol) + (price * vol)) / total_vol, 2)
+            if direction == DIRECTION_BUY:
+                position_profit = round((price - open_price) * total_vol * fut_multiplier, 2)
+            elif direction == DIRECTION_SELL:
+                position_profit = -round((price - open_price) * total_vol * fut_multiplier, 2)
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
+            add_position_data(acct_id, trade_date, ts_code, total_vol, direction, open_price, position_profit)
+            CurrentFund['position_profit'] += position_profit
+    elif open_close == OPEN_CLOSE_CLOSE:
+        if direction == DIRECTION_BUY:
+            opposite_direction = DIRECTION_SELL
+        elif direction == DIRECTION_SELL:
+            opposite_direction = DIRECTION_BUY
+        position_record_df = position_df[(position_df.ts_code == ts_code) & (position_df.direction == opposite_direction)].copy()
+        if len(position_record_df) == 0:
+            return
+        else:
+            position_record_df.reset_index(drop=True, inplace=True)
+            last_vol = position_record_df.loc[0]['vol']
+            last_price = position_record_df.loc[0]['open_price']
+            remain_vol = last_vol - vol
+            if remain_vol > 0:
+                if opposite_direction == DIRECTION_BUY:
+                    close_profit = (price - last_price) * vol * fut_multiplier
+                    position_profit = round((price - last_price) * remain_vol * fut_multiplier, 2)
+                elif opposite_direction == DIRECTION_SELL:
+                    close_profit = -(price - last_price) * vol * fut_multiplier
+                    position_profit = -round((price - last_price) * remain_vol * fut_multiplier, 2)
+                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                add_position_data(acct_id, trade_date, ts_code, remain_vol, opposite_direction, last_price, position_profit)
+                CurrentFund['close_profit'] += close_profit
+                CurrentFund['available'] += close_profit
+                CurrentFund['position_profit'] += position_profit
+            if remain_vol <= 0:
+                if opposite_direction == DIRECTION_BUY:
+                    close_profit = (price - last_price) * vol * fut_multiplier
+                elif opposite_direction == DIRECTION_SELL:
+                    close_profit = -(price - last_price) * vol * fut_multiplier
+                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                CurrentFund['close_profit'] += close_profit
+                CurrentFund['available'] += close_profit
 
 def get_max_drawdown_sys(array):
     array = pd.Series(array)
@@ -144,7 +196,10 @@ def get_win_rate(year):
             win += 1
         else:
             loss += 1
-    return round(win * 100 / (win + loss), 2)
+    if win == loss == 0:
+        return 0
+    else:
+        return round(win * 100 / (win + loss), 2)
 
 def get_result_list(worth_list, result_name):
     print("分析{}净值结果...".format(result_name))
@@ -243,6 +298,7 @@ def write_data_to_xlsx(book_name, setting_data):
     # 插入净值曲线
     print("向 Excel 插入曲线...")
     cnt_of_date = len(worth_list)
+    unit = (max_worth - mini_worth) / 10
     chart = ws.charts.add(20, 120, 800, 400)
     chart.set_source_data(ws.range((1,7),(cnt_of_date,8)))
     # Excel VBA 指令
@@ -257,14 +313,14 @@ def write_data_to_xlsx(book_name, setting_data):
     # chart.api[1].Axes(2).AxisTitle.Text = "价差"             #y轴标题的名字
     chart.api[1].ChartTitle.Text = "净值曲线"     #改变标题文本
     # chart.api[1].Axes(1).MaximumScale = 13  # 横坐标最大值
-    chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.00_);[红色](#,##0.00)"      # 纵坐标格式
-    chart.api[1].Axes(2).MajorUnit = (max_worth - mini_worth) / 10      # 纵坐标单位值
+    chart.api[1].Axes(2).TickLabels.NumberFormatLocal = "#,##0.000_);[红色](#,##0.000)"      # 纵坐标格式
+    chart.api[1].Axes(2).MajorUnit = unit      # 纵坐标单位值
     chart.api[1].Axes(1).MajorUnit = int(len(worth_list) / 8)      # 横坐标单位值
     chart.api[1].Legend.Position = -4107    # 图例显示在下方
     # chart.api[1].DisplayBlanksAs = 3        # 使散点图连续显示
     chart.api[1].Axes(1).TickLabels.NumberFormatLocal = "yy/mm/dd"      # 格式化横坐标显示
-    chart.api[1].Axes(2).CrossesAt = mini_worth - 0.02
-    chart.api[1].Axes(2).MinimumScale = mini_worth - 0.02
+    chart.api[1].Axes(2).CrossesAt = mini_worth - unit
+    chart.api[1].Axes(2).MinimumScale = mini_worth - unit
     chart.api[1].ChartStyle = 245       # 图表格式
     
     wb.save(book_name)
