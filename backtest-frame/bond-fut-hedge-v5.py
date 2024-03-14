@@ -334,6 +334,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
             now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
             remove_code_set.add(code)
     code_list = list(set(code_list) - remove_code_set)
+    code_list.sort()
     
     # 筛选股指期货
     fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
@@ -602,10 +603,12 @@ def main():
         else:
             # 将代码列表中减少的代码进行平仓操作
             remove_code_list = list(set(last_code_list[:-1]) - set(code_list[:-1]))
+            remove_code_list.sort()
             order_list = calculate_bond_sell_order_list(trade_date, position_df, remove_code_list)
             
             # 根据今日市场数据确定今日新增可转债和期货合约的具体仓位
             add_code_list = list(set(code_list[:-1]) - set(last_code_list[:-1])) + code_list[-1:]
+            add_code_list.sort()
             position_dict = calculate_position_dict(last_trade_date, trade_date, add_code_list)
             fut_ts_code = list(position_dict.keys())[len(position_dict) - 1]
             fut_vol = position_dict[fut_ts_code][0]

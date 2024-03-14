@@ -12,7 +12,7 @@ import json
 import os
 import sys
 sys.path.append('./backtest-frame/api/')
-from api.ex_BackTestApi import *
+from api.BackTestApi import *
 
 # 策略参数
 DEFAULT_VALUE = 9999999
@@ -334,6 +334,7 @@ def filter_code_list(last_trade_date, trade_date, next_trade_date, position_df):
             now_code_df.loc[0]['yield_to_maturity'] <= filter_yield_low or code in black_list:
             remove_code_set.add(code)
     code_list = list(set(code_list) - remove_code_set)
+    code_list.sort()
     
     # 筛选股指期货
     fut_md_df.sort_values(by='oi', ascending=False, inplace=True)
@@ -393,21 +394,14 @@ def calculate_bond_sell_order_list(trade_date, position_df, remove_code_list):
     global bond_daily_md_df
     bond_md_df = bond_daily_md_df[(bond_daily_md_df.trade_date == trade_date)].copy()
     
-    order_list = []
     for code in remove_code_list:
         bond_position_df = position_df[position_df.ts_code == code].copy()
         bond_position_df.reset_index(drop=True, inplace=True)
         last_vol = bond_position_df.loc[0]['vol']
-        last_price = bond_position_df.loc[0]['open_price']
         code_df = bond_md_df[bond_md_df.ts_code == code].copy()
         code_df.reset_index(drop=True, inplace=True)
         price = round(code_df.loc[0]['amount'] * 1000 / code_df.loc[0]['vol'], 2)
-        close_profit = round((price - last_price) * last_vol, 2)
-        CurrentFund['close_profit'] += close_profit
-        order = [code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price, close_profit]
-        order_list.append(order)
-        
-    return order_list
+        place_order(acct_id, trade_date, code, last_vol, DIRECTION_SELL, OPEN_CLOSE_NONE, price, position_df)
 
 # 根据资金情况以及所选合约计算详细仓位
 def calculate_position_dict(last_trade_date, trade_date, code_list):
@@ -480,11 +474,9 @@ def calculate_position_dict(last_trade_date, trade_date, code_list):
     
     return position_dict
 
-# 计算持仓变化，生成交易指令
-def calculate_order_list(trade_date, position_dict, position_df):
-    order_list = []
-    
-    # 股指期货交易指令
+# 计算持仓变化，进行交易操作
+def calculate_order_list(trade_date, position_dict, position_df):    
+    # 股指期货交易
     fut_ts_code = list(position_dict.keys())[len(position_dict) - 1]
     fut_value_list = position_dict.pop(fut_ts_code)
     fut_vol = fut_value_list[0]
@@ -500,52 +492,27 @@ def calculate_order_list(trade_date, position_dict, position_df):
             code_df = fut_daily_md_df[((fut_daily_md_df.trade_date == trade_date) & (fut_daily_md_df.ts_code == last_fut_ts_code))].copy()
             code_df.reset_index(drop=True, inplace=True)
             price = round(code_df.loc[0]['amount'] * 10000 / code_df.loc[0]['vol'] / fut_multiplier, 2)
-            close_profit = -(price - last_fut_price) * last_fut_vol * fut_multiplier
-            CurrentFund['close_profit'] += close_profit
-            CurrentFund['available'] += close_profit
-            order = [last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, close_profit]
-            order_list.append(order)
-            order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
-            order_list.append(order)
-            add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
+            place_order(acct_id, trade_date, last_fut_ts_code, last_fut_vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, price, position_df, fut_multiplier)
+            place_order(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, position_df, fut_multiplier)
         else:
             fut_vol_diff = fut_vol - last_fut_vol
             if fut_vol_diff > 0:
-                order = [fut_ts_code, fut_vol_diff, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
-                order_list.append(order)
-                open_price = round(((last_fut_price * last_fut_vol) + (fut_price * fut_vol_diff)) / fut_vol, 2)
-                position_profit = -round((fut_price - open_price) * fut_vol * fut_multiplier, 2)
-                add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, open_price, position_profit)
-                CurrentFund['position_profit'] += position_profit
+                place_order(acct_id, trade_date, fut_ts_code, fut_vol_diff, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, position_df, fut_multiplier)
             elif fut_vol_diff < 0:
-                close_profit = (fut_price - last_fut_price) * fut_vol_diff * fut_multiplier
-                CurrentFund['close_profit'] += close_profit
-                CurrentFund['available'] += close_profit
-                order = [fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price, close_profit]
-                order_list.append(order)
-                position_profit = -round((fut_price - last_fut_price) * fut_vol * fut_multiplier, 2)
-                add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, last_fut_price, position_profit)
-                CurrentFund['position_profit'] += position_profit
+                place_order(acct_id, trade_date, fut_ts_code, -fut_vol_diff, DIRECTION_BUY, OPEN_CLOSE_CLOSE, fut_price, position_df, fut_multiplier)
             else:
                 position_profit = -round((fut_price - last_fut_price) * fut_vol * fut_multiplier, 2)
                 add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, last_fut_price, position_profit)
                 CurrentFund['position_profit'] += position_profit
     else:
-        order = [fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, 0]
-        order_list.append(order)
-        add_position_data(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, fut_price, 0)
+        place_order(acct_id, trade_date, fut_ts_code, fut_vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, fut_price, position_df, fut_multiplier)
     
-    # 可转债多头交易指令
+    # 可转债多头交易
     for code, value_list in position_dict.items():
         vol = value_list[0]
         price = value_list[1]
-        order = [code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price, 0]
-        order_list.append(order)
-        add_position_data(acct_id, trade_date, code, vol, DIRECTION_BUY, price, 0)
-        highest_price_dict[code] = price
-    
-    return order_list
-                
+        place_order(acct_id, trade_date, code, vol, DIRECTION_BUY, OPEN_CLOSE_NONE, price, position_df)
+        highest_price_dict[code] = price           
 
 # 策略主线程
 def main():
@@ -602,24 +569,21 @@ def main():
         else:
             # 将代码列表中减少的代码进行平仓操作
             remove_code_list = list(set(last_code_list[:-1]) - set(code_list[:-1]))
-            order_list = calculate_bond_sell_order_list(trade_date, position_df, remove_code_list)
+            remove_code_list.sort()
+            calculate_bond_sell_order_list(trade_date, position_df, remove_code_list)
             
             # 根据今日市场数据确定今日新增可转债和期货合约的具体仓位
             add_code_list = list(set(code_list[:-1]) - set(last_code_list[:-1])) + code_list[-1:]
+            add_code_list.sort()
             position_dict = calculate_position_dict(last_trade_date, trade_date, add_code_list)
             fut_ts_code = list(position_dict.keys())[len(position_dict) - 1]
             fut_vol = position_dict[fut_ts_code][0]
             
-            # 根据昨日持仓以及今日持仓计算得到今日的交易指令列表
-            buy_order_list = calculate_order_list(trade_date, position_dict, position_df)
-            order_list += buy_order_list
+            # 根据昨日持仓以及今日持仓计算得到今日的交易指令并进行交易
+            calculate_order_list(trade_date, position_dict, position_df)
             
             # 将代码列表中保持的可转债代码进行持仓盈亏的更新
             update_position_profit(trade_date, position_df, remove_code_list + last_code_list[-1:])
-            
-            # 根据交易指令列表向柜台发出交易指令，更新【成交数据】，【资金数据】
-            for order in order_list:
-                place_order(acct_id, trade_date, order)
         
         # 更新账户资金数据
         CurrentFund['trade_date'] = trade_date

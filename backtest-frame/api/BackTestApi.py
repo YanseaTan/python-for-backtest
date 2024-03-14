@@ -107,29 +107,55 @@ def get_position_data(acct_id, trade_date = ''):
 
 # 进行下单操作，更新账户可用资金
 # fut_multiplier 为期货下单必填项，证券下单可不填
-def place_order(acct_id, trade_date, order, position_df, fut_multiplier):
-    ts_code = order[0]
-    vol = order[1]
-    direction = order[2]
-    open_close = order[3]
-    price = order[4]
-    
+def place_order(acct_id, trade_date, ts_code, vol, direction, open_close, price, position_df, fut_multiplier=1):    
     # 无开平信息则为证券交易
     if open_close == OPEN_CLOSE_NONE:
+        # 证券开仓
         if direction == DIRECTION_BUY:
-            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
             CurrentFund['available'] -= price * vol
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
+            # 查询同合约持仓记录
+            position_record_df = position_df[position_df.ts_code == ts_code].copy()
+            if len(position_record_df) == 0:
+                add_position_data(acct_id, trade_date, ts_code, vol, direction, price, 0)
+            else:
+                position_record_df.reset_index(drop=True, inplace=True)
+                last_vol = position_record_df.loc[0]['vol']
+                last_price = position_record_df.loc[0]['open_price']
+                total_vol = last_vol + vol
+                open_price = round(((last_price * last_vol) + (price * vol)) / total_vol, 2)
+                position_profit = round((price - open_price) * total_vol, 2)
+                add_position_data(acct_id, trade_date, ts_code, total_vol, direction, open_price, position_profit)
+                CurrentFund['position_profit'] += position_profit
+        # 证券平仓
         elif direction == DIRECTION_SELL:
-            close_profit = 0 # todo
-            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
             CurrentFund['available'] += price * vol
-    
+            # 查询同合约持仓记录
+            position_record_df = position_df[position_df.ts_code == ts_code].copy()
+            if len(position_record_df) == 0:
+                return
+            position_record_df.reset_index(drop=True, inplace=True)
+            last_vol = position_record_df.loc[0]['vol']
+            last_price = position_record_df.loc[0]['open_price']
+            remain_vol = last_vol - vol
+            if remain_vol > 0:
+                close_profit = (price - last_price) * vol
+                position_profit = round((price - last_price) * remain_vol, 2)
+                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                add_position_data(acct_id, trade_date, ts_code, remain_vol, DIRECTION_BUY, last_price, position_profit)
+                CurrentFund['close_profit'] += close_profit
+                CurrentFund['position_profit'] += position_profit
+            else:
+                close_profit = (price - last_price) * vol
+                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                CurrentFund['close_profit'] += close_profit
+                
     # 期货开仓
     elif open_close == OPEN_CLOSE_OPEN:
+        add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
         # 查询同合约同方向持仓记录
         position_record_df = position_df[(position_df.ts_code == ts_code) & (position_df.direction == direction)].copy()
         if len(position_record_df) == 0:
-            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
             add_position_data(acct_id, trade_date, ts_code, vol, direction, price, 0)
         else:
             position_record_df.reset_index(drop=True, inplace=True)
@@ -141,7 +167,6 @@ def place_order(acct_id, trade_date, order, position_df, fut_multiplier):
                 position_profit = round((price - open_price) * total_vol * fut_multiplier, 2)
             elif direction == DIRECTION_SELL:
                 position_profit = -round((price - open_price) * total_vol * fut_multiplier, 2)
-            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, 0)
             add_position_data(acct_id, trade_date, ts_code, total_vol, direction, open_price, position_profit)
             CurrentFund['position_profit'] += position_profit
     # 期货平仓
@@ -154,31 +179,30 @@ def place_order(acct_id, trade_date, order, position_df, fut_multiplier):
         position_record_df = position_df[(position_df.ts_code == ts_code) & (position_df.direction == opposite_direction)].copy()
         if len(position_record_df) == 0:
             return
+        position_record_df.reset_index(drop=True, inplace=True)
+        last_vol = position_record_df.loc[0]['vol']
+        last_price = position_record_df.loc[0]['open_price']
+        remain_vol = last_vol - vol
+        if remain_vol > 0:
+            if opposite_direction == DIRECTION_BUY:
+                close_profit = (price - last_price) * vol * fut_multiplier
+                position_profit = round((price - last_price) * remain_vol * fut_multiplier, 2)
+            elif opposite_direction == DIRECTION_SELL:
+                close_profit = -(price - last_price) * vol * fut_multiplier
+                position_profit = -round((price - last_price) * remain_vol * fut_multiplier, 2)
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+            add_position_data(acct_id, trade_date, ts_code, remain_vol, opposite_direction, last_price, position_profit)
+            CurrentFund['close_profit'] += close_profit
+            CurrentFund['available'] += close_profit
+            CurrentFund['position_profit'] += position_profit
         else:
-            position_record_df.reset_index(drop=True, inplace=True)
-            last_vol = position_record_df.loc[0]['vol']
-            last_price = position_record_df.loc[0]['open_price']
-            remain_vol = last_vol - vol
-            if remain_vol > 0:
-                if opposite_direction == DIRECTION_BUY:
-                    close_profit = (price - last_price) * vol * fut_multiplier
-                    position_profit = round((price - last_price) * remain_vol * fut_multiplier, 2)
-                elif opposite_direction == DIRECTION_SELL:
-                    close_profit = -(price - last_price) * vol * fut_multiplier
-                    position_profit = -round((price - last_price) * remain_vol * fut_multiplier, 2)
-                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
-                add_position_data(acct_id, trade_date, ts_code, remain_vol, opposite_direction, last_price, position_profit)
-                CurrentFund['close_profit'] += close_profit
-                CurrentFund['available'] += close_profit
-                CurrentFund['position_profit'] += position_profit
-            if remain_vol <= 0:
-                if opposite_direction == DIRECTION_BUY:
-                    close_profit = (price - last_price) * vol * fut_multiplier
-                elif opposite_direction == DIRECTION_SELL:
-                    close_profit = -(price - last_price) * vol * fut_multiplier
-                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
-                CurrentFund['close_profit'] += close_profit
-                CurrentFund['available'] += close_profit
+            if opposite_direction == DIRECTION_BUY:
+                close_profit = (price - last_price) * vol * fut_multiplier
+            elif opposite_direction == DIRECTION_SELL:
+                close_profit = -(price - last_price) * vol * fut_multiplier
+            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+            CurrentFund['close_profit'] += close_profit
+            CurrentFund['available'] += close_profit
 
 # 得到列表中数据的最大回撤
 def get_max_drawdown_sys(array):

@@ -5,10 +5,8 @@
 # @Last Modified time: 2024-03-14
 
 import pandas as pd
-import xlwings as xw
 import datetime
 import time
-import json
 import os
 import sys
 sys.path.append('./backtest-frame/api/')
@@ -19,7 +17,7 @@ test_year = '2023'
 fut_code = 'HC'
 spread_type = '10-01'
 index_name = '库存:热卷(板)'    # 后续如果确定唯一有效的库存数据，则此参数可以去除
-fut_multiplier = 10
+fut_multiplier = 1             # 不用修改会自动读取
 margin_rate = 0.2
 
 acct_id = 'hailong'
@@ -30,8 +28,8 @@ num_of_years = 3
 
 MAX_VALUE = 9999999999
 
-setting_data = pd.DataFrame(columns=['init_fund', 'test_year', 'fut_code', 'fut_multiplier', 'margin_rate', 'spread_type', 'total_vol', 'per_vol'])
-setting_data.loc[0] = [init_fund, test_year, fut_code, fut_multiplier, margin_rate, spread_type, total_vol, per_vol]
+setting_data = pd.DataFrame(columns=['init_fund', 'test_year', 'fut_code', 'margin_rate', 'spread_type', 'total_vol', 'per_vol'])
+setting_data.loc[0] = [init_fund, test_year, fut_code, margin_rate, spread_type, total_vol, per_vol]
 
 # 公共变量
 spread_md_df = pd.DataFrame()
@@ -182,14 +180,14 @@ def make_order(trade_date, position_df, order_plan):
         
         if order_plan[0] == OPEN_CLOSE_OPEN:
             # 一腿买开
-            place_order(acct_id, trade_date, [first_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_OPEN, first_price], position_df, fut_multiplier)
+            place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_OPEN, first_price, position_df, fut_multiplier)
             # 二腿卖开
-            place_order(acct_id, trade_date, [second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, second_price], position_df, fut_multiplier)
+            place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, second_price, position_df, fut_multiplier)
         elif last_vol != 0 and order_plan[0] == OPEN_CLOSE_CLOSE:
             # 一腿卖平
-            place_order(acct_id, trade_date, [first_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_CLOSE, first_price], position_df, fut_multiplier)
+            place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_CLOSE, first_price, position_df, fut_multiplier)
             # 二腿买平
-            place_order(acct_id, trade_date, [second_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, second_price], position_df, fut_multiplier)
+            place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, second_price, position_df, fut_multiplier)
 
 def main():
     # 计算起止日期
@@ -226,6 +224,12 @@ def main():
     sql = "select update_date, value from future.fut_funds where fut_code = '{}' and index_name = '{}' order by update_date".format(fut_code, index_name, end_date)
     global inventory_df
     inventory_df = read_postgre_data(sql)
+    
+    # 获取合约乘数
+    sql = "select per_unit from future.fut_basic where fut_code = '{}' limit 1".format(fut_code)
+    fut_multiplier_df = read_postgre_data(sql)
+    global fut_multiplier
+    fut_multiplier = fut_multiplier_df.loc[0]['per_unit']
     
     # 第一天设置初始资金
     set_init_fund(acct_id, start_date, init_fund)
