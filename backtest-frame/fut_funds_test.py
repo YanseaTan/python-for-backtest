@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-06
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-13
+# @Last Modified time: 2024-03-14
 
 import pandas as pd
 import xlwings as xw
@@ -16,9 +16,9 @@ from api.BackTestApi import *
 
 # 参数设置
 test_year = '2023'
-fut_code = 'M'
-spread_type = '05-07'
-index_name = '豆粕库存_中国'    # 后续如果确定唯一有效的库存数据，则此参数可以去除
+fut_code = 'HC'
+spread_type = '10-01'
+index_name = '库存:热卷(板)'    # 后续如果确定唯一有效的库存数据，则此参数可以去除
 fut_multiplier = 10
 margin_rate = 0.2
 
@@ -42,6 +42,7 @@ first_ts_code = ''
 second_ts_code = ''
 
 # 根据库存走势以及库存历史位置分位数进行打分
+last_loc_percent = MAX_VALUE
 def calculate_inventory_score(last_trade_date):
     score = 0
     
@@ -50,36 +51,36 @@ def calculate_inventory_score(last_trade_date):
     last_inventory_df.reset_index(drop=True, inplace=True)
     last_inventory = last_inventory_df.loc[0]['value']
     previous_inventory = last_inventory_df.loc[1]['value']
-    # 根据库存走势打分
-    if last_inventory < previous_inventory:
-        score += 1
-    else:
-        score -= 1
+    # 根据库存走势打分（暂时未启用）
+    # if last_inventory < previous_inventory:
+    #     score += 1
+    # else:
+    #     score -= 1
     
+    # 默认取历年当天或向前最近一天的库存数据
     max_inventory = -MAX_VALUE
     mini_inventory = MAX_VALUE
     for i in range(1, num_of_years + 1):
         date = str(int(last_trade_date[:4]) - i) + last_trade_date[-4:]
-        
         left_inventory_df = inventory_df[inventory_df.update_date <= date].copy()
         left_inventory_df.sort_values(by='update_date', ascending=False, inplace=True)
         left_inventory_df.reset_index(drop=True, inplace=True)
         inventory = left_inventory_df.loc[0]['value']
         max_inventory = max(max_inventory, inventory)
         mini_inventory = min(mini_inventory, inventory)
-        
-        right_inventory_df = inventory_df[inventory_df.update_date >= date].copy()
-        right_inventory_df.sort_values(by='update_date', ascending=True, inplace=True)
-        right_inventory_df.reset_index(drop=True, inplace=True)
-        inventory = right_inventory_df.loc[0]['value']
-        max_inventory = max(max_inventory, inventory)
-        mini_inventory = min(mini_inventory, inventory)
-    # 根据库存历史位置打分
+    # 根据库存历史分位数位置打分
     loc_percent = (last_inventory - mini_inventory) / (max_inventory - mini_inventory)
     if loc_percent < 0.5:
         score += 1
     elif loc_percent > 1:
-        score -= 1
+        score -= 2
+        
+    # 根据库存历史分位数位置变化打分
+    global last_loc_percent
+    if last_loc_percent != MAX_VALUE:
+        if loc_percent > last_loc_percent:
+            score -= 2
+    last_loc_percent = loc_percent
         
     return score
 
@@ -127,7 +128,7 @@ def calculate_order(last_trade_date):
     
     if score >= 2:
         order_plan = [OPEN_CLOSE_OPEN, per_vol]
-    elif score <= -2:
+    elif score <= 0:
         order_plan = [OPEN_CLOSE_CLOSE, per_vol]
     else:
         order_plan = [OPEN_CLOSE_NONE, 0]
@@ -184,7 +185,7 @@ def make_order(trade_date, position_df, order_plan):
             place_order(acct_id, trade_date, [first_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_OPEN, first_price], position_df, fut_multiplier)
             # 二腿卖开
             place_order(acct_id, trade_date, [second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, second_price], position_df, fut_multiplier)
-        elif order_plan[0] == OPEN_CLOSE_CLOSE:
+        elif last_vol != 0 and order_plan[0] == OPEN_CLOSE_CLOSE:
             # 一腿卖平
             place_order(acct_id, trade_date, [first_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_CLOSE, first_price], position_df, fut_multiplier)
             # 二腿买平
