@@ -13,7 +13,7 @@ sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 
 # 参数设置
-test_year = '2023'
+test_year = '2022'
 fut_code = 'HC'
 spread_type = '10-01'
 index_name = '库存:热卷(板)'    # 后续如果确定唯一有效的库存数据，则此参数可以去除
@@ -24,7 +24,12 @@ acct_id = 'hailong'
 init_fund = 2000000
 total_vol = 40
 per_vol = 1
-num_of_years = 3
+num_of_years = 2
+
+inventory_loc_percent_down = 0.4
+inventory_loc_percent_up = 1
+spread_loc_percent_down = 0.4
+spread_loc_percent_up = 1
 
 MAX_VALUE = 9999999999
 
@@ -49,11 +54,11 @@ def calculate_inventory_score(last_trade_date):
     last_inventory_df.reset_index(drop=True, inplace=True)
     last_inventory = last_inventory_df.loc[0]['value']
     previous_inventory = last_inventory_df.loc[1]['value']
-    # 根据库存走势打分（暂时未启用）
-    # if last_inventory < previous_inventory:
-    #     score += 1
-    # else:
-    #     score -= 1
+    # 根据库存走势打分
+    if last_inventory < previous_inventory:
+        score += 1
+    else:
+        score -= 2
     
     # 默认取历年当天或向前最近一天的库存数据
     max_inventory = -MAX_VALUE
@@ -67,18 +72,18 @@ def calculate_inventory_score(last_trade_date):
         max_inventory = max(max_inventory, inventory)
         mini_inventory = min(mini_inventory, inventory)
     # 根据库存历史分位数位置打分
-    loc_percent = (last_inventory - mini_inventory) / (max_inventory - mini_inventory)
-    if loc_percent < 0.5:
-        score += 1
-    elif loc_percent > 1:
-        score -= 2
+    # loc_percent = (last_inventory - mini_inventory) / (max_inventory - mini_inventory)
+    # if loc_percent < inventory_loc_percent_down:
+    #     score += 1
+    # elif loc_percent > inventory_loc_percent_up:
+    #     score -= 2
         
     # 根据库存历史分位数位置变化打分
-    global last_loc_percent
-    if last_loc_percent != MAX_VALUE:
-        if loc_percent > last_loc_percent:
-            score -= 2
-    last_loc_percent = loc_percent
+    # global last_loc_percent
+    # if last_loc_percent != MAX_VALUE:
+    #     if loc_percent > last_loc_percent:
+    #         score -= 2
+    # last_loc_percent = loc_percent
         
     return score
 
@@ -110,9 +115,9 @@ def calculate_spread_score(last_trade_date):
         mini_spread = min(mini_spread, spread)
     # 根据价差历史位置打分
     loc_percent = (last_spread - mini_spread) / (max_spread - mini_spread)
-    if loc_percent < 0.5:
+    if loc_percent < spread_loc_percent_down:
         score += 1
-    elif loc_percent > 1:
+    elif loc_percent > spread_loc_percent_up:
         score -= 1
     
     return score
@@ -127,7 +132,7 @@ def calculate_order(last_trade_date):
     if score >= 2:
         order_plan = [OPEN_CLOSE_OPEN, per_vol]
     elif score <= 0:
-        order_plan = [OPEN_CLOSE_CLOSE, per_vol]
+        order_plan = [OPEN_CLOSE_CLOSE, total_vol]
     else:
         order_plan = [OPEN_CLOSE_NONE, 0]
         
@@ -174,20 +179,20 @@ def make_order(trade_date, position_df, order_plan):
             last_vol = position_df.loc[0]['vol']
         vol = order_plan[1]
         
-        if (last_vol + vol) > total_vol:
-            update_position_profit(trade_date, position_df)
-            return
-        
         if order_plan[0] == OPEN_CLOSE_OPEN:
-            # 一腿买开
-            place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_OPEN, first_price, position_df, fut_multiplier)
-            # 二腿卖开
-            place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, second_price, position_df, fut_multiplier)
-        elif last_vol != 0 and order_plan[0] == OPEN_CLOSE_CLOSE:
-            # 一腿卖平
-            place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_CLOSE, first_price, position_df, fut_multiplier)
-            # 二腿买平
-            place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, second_price, position_df, fut_multiplier)
+            if (last_vol + vol) > total_vol:
+                update_position_profit(trade_date, position_df)
+            else:
+                # 一腿买开
+                place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_OPEN, first_price, position_df, fut_multiplier)
+                # 二腿卖开
+                place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_OPEN, second_price, position_df, fut_multiplier)
+        elif order_plan[0] == OPEN_CLOSE_CLOSE:
+            if last_vol != 0:
+                # 一腿卖平
+                place_order(acct_id, trade_date, first_ts_code, vol, DIRECTION_SELL, OPEN_CLOSE_CLOSE, first_price, position_df, fut_multiplier)
+                # 二腿买平
+                place_order(acct_id, trade_date, second_ts_code, vol, DIRECTION_BUY, OPEN_CLOSE_CLOSE, second_price, position_df, fut_multiplier)
 
 def main():
     # 计算起止日期

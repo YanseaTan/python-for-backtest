@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-22
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-14
+# @Last Modified time: 2024-03-15
 
 import pandas as pd
 import xlwings as xw
@@ -129,7 +129,6 @@ def place_order(acct_id, trade_date, ts_code, vol, direction, open_close, price,
                 CurrentFund['position_profit'] += position_profit
         # 证券平仓
         elif direction == DIRECTION_SELL:
-            CurrentFund['available'] += price * vol
             # 查询同合约持仓记录
             position_record_df = position_df[position_df.ts_code == ts_code].copy()
             if len(position_record_df) == 0:
@@ -139,6 +138,7 @@ def place_order(acct_id, trade_date, ts_code, vol, direction, open_close, price,
             last_price = position_record_df.loc[0]['open_price']
             remain_vol = last_vol - vol
             if remain_vol > 0:
+                CurrentFund['available'] += price * vol
                 close_profit = (price - last_price) * vol
                 position_profit = round((price - last_price) * remain_vol, 2)
                 add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
@@ -146,8 +146,9 @@ def place_order(acct_id, trade_date, ts_code, vol, direction, open_close, price,
                 CurrentFund['close_profit'] += close_profit
                 CurrentFund['position_profit'] += position_profit
             else:
-                close_profit = (price - last_price) * vol
-                add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                CurrentFund['available'] += price * last_vol
+                close_profit = (price - last_price) * last_vol
+                add_trade_data(acct_id, trade_date, ts_code, last_vol, direction, open_close, price, close_profit)
                 CurrentFund['close_profit'] += close_profit
                 
     # 期货开仓
@@ -197,10 +198,10 @@ def place_order(acct_id, trade_date, ts_code, vol, direction, open_close, price,
             CurrentFund['position_profit'] += position_profit
         else:
             if opposite_direction == DIRECTION_BUY:
-                close_profit = (price - last_price) * vol * fut_multiplier
+                close_profit = (price - last_price) * last_vol * fut_multiplier
             elif opposite_direction == DIRECTION_SELL:
-                close_profit = -(price - last_price) * vol * fut_multiplier
-            add_trade_data(acct_id, trade_date, ts_code, vol, direction, open_close, price, close_profit)
+                close_profit = -(price - last_price) * last_vol * fut_multiplier
+            add_trade_data(acct_id, trade_date, ts_code, last_vol, direction, open_close, price, close_profit)
             CurrentFund['close_profit'] += close_profit
             CurrentFund['available'] += close_profit
 
@@ -222,7 +223,7 @@ def get_win_rate(year):
     for i in range(0, len(TradeData_copy)):
         direction = TradeData_copy.loc[i]['direction']
         open_close = TradeData_copy.loc[i]['open_close']
-        if direction == DIRECTION_BUY or open_close != OPEN_CLOSE_NONE:
+        if (direction == DIRECTION_BUY and open_close == OPEN_CLOSE_NONE) or open_close == OPEN_CLOSE_OPEN:
             continue
         close_profit = TradeData_copy.loc[i]['close_profit']
         if close_profit >= 0:
