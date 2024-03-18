@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-07
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-12
+# @Last Modified time: 2024-03-15
 
 import pandas as pd
 import xlwings as xw
@@ -259,7 +259,7 @@ def main():
         os.makedirs('output/{}/'.format(todayStr))
     book_name = './output/{}/{}-{}-简化低溢价进攻选债净值回测-{}.xlsx'.format(todayStr, start_date, end_date, timeStr)
     write_data_to_xlsx(book_name, setting_data)
-    write_profit_to_xlsx(book_name)
+    write_close_profit_to_xlsx(book_name)
 
 
 if __name__ == "__main__":

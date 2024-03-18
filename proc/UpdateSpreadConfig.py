@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-01-26
+# @Last Modified time: 2024-03-15
 
 import datetime
 import tushare as ts
@@ -126,8 +126,87 @@ def update_spread_config():
     f.close()
     print('价差配置文件更新完毕！')
 
+# 更新期货单腿合约价格配置文件
+def update_single_leg_config():
+    # 获取所有合约基本信息
+    sql = "select ts_code, fut_code, list_date from future.fut_basic where list_date >= '20190101'"
+    fut_basic_df = read_postgre_data(sql)
+    fut_code_list = fut_basic_df['fut_code'].tolist()
+    fut_code_list = list(set(fut_code_list))
+    fut_code_list.sort()
+    
+    # 获取所有合约行情信息
+    sql = "select ts_code, trade_date, close, vol from future.fut_daily where trade_date >= '20190101' and oi_chg is not NULL and close is not NULL order by trade_date"
+    fut_md_df = read_postgre_data(sql)
+    
+    config_list = []
+    
+    for i in range(0, len(fut_code_list)):
+        fut_code = fut_code_list[i]
+        fut_config_dict = {}
+        fut_config_dict['fut_code'] = fut_code
+        ts_code_df = fut_basic_df[fut_basic_df.fut_code == fut_code].copy()
+        ts_code_df.insert(len(ts_code_df.columns), 'month', '')
+        ts_code_df.reset_index(drop=True, inplace=True)
+        month_list = []
+        # 为合约基础数据增加合约月份信息
+        for j in range(0, len(ts_code_df)):
+            ts_code = ts_code_df.loc[j]['ts_code']
+            month = ts_code[:ts_code.index('.')][-2:]
+            ts_code_df.loc[j, 'month'] = month
+            month_list.append(month)
+        ts_code_df.sort_values(by='month', ascending=True, inplace=True)
+        ts_code_df.reset_index(drop=True, inplace=True)
+        month_list = list(set(month_list))
+        month_list.sort()
+        
+        # 按合约月份进行分类计算
+        rec_price_dict = {}
+        fut_config_dict['rec_price'] = rec_price_dict
+        for j in range(0, len(month_list)):
+            month = month_list[j]
+            month_ts_code_df = ts_code_df[ts_code_df.month == month].copy()
+            month_ts_code_list = month_ts_code_df['ts_code'].tolist()
+            close_df = pd.DataFrame()
+            for k in range(0, len(month_ts_code_list)):
+                ts_code = month_ts_code_list[k]
+                md_df = fut_md_df[fut_md_df.ts_code == ts_code].copy()
+                if len(md_df) < 66:
+                    continue
+                md_df.reset_index(drop=True, inplace=True)
+                # 去除交割前一个月的数据（如果未达到日期则不去除）
+                md_df.drop(md_df[md_df.index >= (len(md_df) - 22)].index, inplace=True)
+                # 通过中位数剔除毛刺数据（当日成交量小于 1000 手则认为是毛刺）
+                me = np.median(md_df['close'])
+                mad = np.median(abs(md_df['close'] - me))
+                up = me + (2*mad)
+                down = me - (2*mad)
+                md_df.drop(md_df[(((md_df.close < down) | (md_df.close > up)) & (md_df.vol < 1000))].index, inplace=True)
+                close_df = pd.concat([close_df, md_df])
+            
+            num = len(close_df)
+            if num == 0:
+                continue
+            close_df.sort_values(by='close', ascending=True, inplace=True)
+            close_df.reset_index(drop=True, inplace=True)
+            # 可转抛计算底部 10% 区间的价差阈值，不可转抛计算底部 5% 区间的价差阈值
+            high = close_df.loc[num - 1]['close']
+            low = close_df.loc[0]['close']
+            rec_price = round((low + (high - low) * 0.1), 1)
+            rec_price_dict[month] = rec_price
+        
+        config_list.append(fut_config_dict)
+        print('{} 推荐价格配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(fut_code_list) * 100, '.2f')))
+    
+    f = open('./output/recPrice.json', 'w')
+    content = json.dumps(config_list, indent=2)
+    f.write(content)
+    f.close()
+    print('推荐价格配置文件更新完毕！')
+
 def main():
-    update_spread_config()
+    # update_spread_config()
+    update_single_leg_config()
 
 if __name__ == "__main__":
     # 登录 Tushare 接口
