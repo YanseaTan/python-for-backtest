@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-18
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-15
+# @Last Modified time: 2024-03-19
 
 import datetime
 import tushare as ts
@@ -144,7 +144,6 @@ def update_single_leg_config():
     for i in range(0, len(fut_code_list)):
         fut_code = fut_code_list[i]
         fut_config_dict = {}
-        fut_config_dict['fut_code'] = fut_code
         ts_code_df = fut_basic_df[fut_basic_df.fut_code == fut_code].copy()
         ts_code_df.insert(len(ts_code_df.columns), 'month', '')
         ts_code_df.reset_index(drop=True, inplace=True)
@@ -161,8 +160,7 @@ def update_single_leg_config():
         month_list.sort()
         
         # 按合约月份进行分类计算
-        rec_price_dict = {}
-        fut_config_dict['rec_price'] = rec_price_dict
+        rec_price_list = []
         for j in range(0, len(month_list)):
             month = month_list[j]
             month_ts_code_df = ts_code_df[ts_code_df.month == month].copy()
@@ -193,10 +191,14 @@ def update_single_leg_config():
             high = close_df.loc[num - 1]['close']
             low = close_df.loc[0]['close']
             rec_price = round((low + (high - low) * 0.1), 1)
-            rec_price_dict[month] = rec_price
+            rec_price_list.append(rec_price)
         
-        config_list.append(fut_config_dict)
-        print('{} 推荐价格配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(fut_code_list) * 100, '.2f')))
+        if len(month_list) == len(rec_price_list):
+            fut_config_dict['fut_code'] = fut_code
+            fut_config_dict['month'] = month_list
+            fut_config_dict['rec_price'] = rec_price_list
+            config_list.append(fut_config_dict)
+            print('{} 推荐价格配置写入成功，文件更新进度：{}%'.format(fut_code, format((i + 1) / len(fut_code_list) * 100, '.2f')))
     
     f = open('./output/recPrice.json', 'w')
     content = json.dumps(config_list, indent=2)
@@ -205,7 +207,7 @@ def update_single_leg_config():
     print('推荐价格配置文件更新完毕！')
 
 def main():
-    # update_spread_config()
+    update_spread_config()
     update_single_leg_config()
 
 if __name__ == "__main__":
