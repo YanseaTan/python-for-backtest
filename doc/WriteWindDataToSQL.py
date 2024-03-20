@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-01
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-02-29
+# @Last Modified time: 2024-03-19
 
 import pandas as pd
 import xlwings as xw
@@ -145,9 +145,61 @@ def write_wind_daily_data_to_sql():
         get_wind_daily_data(file)
         print("{} 日行情数据写入完毕，进度：{}%".format(file[:8], round((i + 1) / len(files) * 100, 2)))
 
+def get_wind_treasury_bonds_data(file):
+    # 本地 excel 处理，否则不能用 pandas 读取
+    file_path = './doc/treasury-bonds-data/{}'.format(file)
+    app = xw.App(visible = False, add_book = False)
+    app.display_alerts = False
+    app.screen_updating = False
+    workbook = app.books.open(file_path)
+    workbook.save()
+    workbook.close()
+    app.quit()
+    
+    data = pd.read_excel(file_path, skipfooter=2, names=['trade_date', 'bond_code', 'bond_price', 'yield', 'irr', 'spread', 'basis', 'rank'],
+                         dtype={'trade_date': str})
+    data = pd.DataFrame(data)
+    data.dropna(axis=0, how='any', inplace=True)
+    data.drop(columns=['rank'], inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    # 去除末期连续的无成交量数据，中期的数据保留
+    for i in range(0, len(data)):
+        bond_price = data.loc[i]['bond_price']
+        if bond_price == '--':
+            data.drop(index=i, inplace=True)
+    data.reset_index(drop=True, inplace=True)
+    
+    # 修改列属性
+    data[['bond_price']] = data[['bond_price']].astype('float')
+    data[['yield']] = data[['yield']].astype('float')
+    data[['irr']] = data[['irr']].astype('float')
+    data[['spread']] = data[['spread']].astype('float')
+    data[['basis']] = data[['basis']].astype('float')
+    
+    # 将日期转换为通用的字符串形式
+    trade_date = data.trade_date.str.replace(' 00:00:00', '')
+    trade_date = trade_date.str.replace('-', '')
+    data.trade_date = trade_date
+    
+    data.insert(1, 'ts_code', file[:file.index('-')] + '.CFX')
+    rank = int(file[file.index('-') + 1:file.index('.')])
+    data.insert(len(data.columns), 'rank', rank)
+    
+    write_data('treasury_bond_data', 'bond', data)
+
+def write_wind_treasury_bonds_data_to_sql():
+    path = './doc/treasury-bonds-data'
+    files = os.listdir(path)
+    for i in range(0, len(files)):
+        file = files[i]
+        get_wind_treasury_bonds_data(file)
+        print("{} 国债期货可交割现券日行情数据写入完毕，进度：{}%".format(file[:file.index('-')], round((i + 1) / len(files) * 100, 2)))
+
 def main():
     # write_wind_code_data_to_sql()
-    write_wind_daily_data_to_sql()
+    # write_wind_daily_data_to_sql()
+    write_wind_treasury_bonds_data_to_sql()
 
 
 if __name__ == "__main__":

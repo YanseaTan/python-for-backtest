@@ -166,6 +166,7 @@ installEmQuantAPI.py
 trending-stock/可转债.xlsx
 trending-stock/收益率.xlsx
 *.xlsx
+*.csv
 output/
 temp/
 .idea/
