@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-19
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-19
+# @Last Modified time: 2024-03-21
 
 import time
 from numpy import NaN
@@ -22,12 +22,16 @@ def export_tqsdk_kline_data_to_csv():
     
     sql = "select distinct ts_code from stock.stock_basic order by ts_code"
     ts_code_df = read_postgre_data(sql)
+    ts_code_df = ts_code_df[ts_code_df.ts_code > '601238.SH'].copy()
+    ts_code_df.reset_index(drop=True, inplace=True)
     for i in range(0, len(ts_code_df)):
         ts_code = ts_code_df.loc[i]['ts_code']
         if ts_code[-2:] == 'SH':
             ts_code = 'SSE.' + ts_code[:6]
-        else:
+        elif ts_code[-2:] == 'SZ':
             ts_code = 'SZSE.' + ts_code[:6]
+        else:
+            continue
     
         kd = DataDownloader(api, symbol_list=ts_code, dur_sec=60,
                         start_dt=datetime(2021, 1, 1, 6, 0 ,0), end_dt=datetime(2024, 3, 18, 16, 0, 0), csv_file_name="./doc/minute-kline/{}.kline.csv".format(ts_code))
