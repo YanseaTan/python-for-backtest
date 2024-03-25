@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-03-21
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-22
+# @Last Modified time: 2024-03-25
 
 from WindPy import w
 import pandas as pd
@@ -27,6 +27,9 @@ def export_treasury_daily_data_to_csv():
     end_date = '2024-03-21'
     for i in range(0, len(code_list)):
         code = code_list[i]
+        if code <= '230023.IB':
+            continue
+        
         data = w.wsd(code, "carrydate,maturitydate", "2024-03-19", "2024-03-19", "contractType=NQ1;returnType=1;bondPriceType=1;PriceAdj=CP")
         if data.ErrorCode != 0:
             print(code, data.ErrorCode)
@@ -37,6 +40,10 @@ def export_treasury_daily_data_to_csv():
         
         data = w.wsd(code, "tbf_cvf2,tbf_spread,cleanprice,volume,ytm_b,tbf_IRR2", start_date, end_date, "contractType=NQ1;returnType=1;bondPriceType=1;PriceAdj=CP", usedf=True)
         data = data[-1]
+        if len(data.columns) < 2:
+            print("{} 国债现券数据为空，导入失败！".format(code))
+            continue
+        
         data.insert(0, 'trade_date', data.index)
         data.columns = ['trade_date', 'cvf', 'spread', 'clean_price', 'amount', 'ytm', 'irr']
         data.to_csv('./doc/daily-kline/treasury/{}.csv'.format(code), index=False)

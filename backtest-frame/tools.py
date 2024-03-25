@@ -2,20 +2,15 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-11
+# @Last Modified time: 2024-03-25
 
+from turtle import color
 import pandas as pd
 import xlwings as xw
-import datetime
-import time
-import os
 import seaborn as sns
 import matplotlib.pyplot as plt
-from copy import deepcopy
-from sqlalchemy import column, create_engine
+import numpy as np
 import sys
-
-from tools.DatabaseTools import write_data
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
 
@@ -309,6 +304,65 @@ def analyze_worth_result(book_name, column):
     wb.close()
     app.quit()
 
+# 期货库存与价差散点图绘制
+def export_fut_inventory_spread_to_xlsx(fut_code, spread_type, index_name, start_date, end_date):
+    sql = "select update_date, value from future.fut_funds where index_name = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(index_name, start_date, end_date)
+    inventory_df = read_postgre_data(sql)
+    start_date = inventory_df.loc[0]['update_date']
+    end_date = inventory_df.loc[len(inventory_df) - 1]['update_date']
+    
+    sql = "select trade_date, close from future.fut_spread_daily where fut_code = '{}' and spread_type = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, spread_type, start_date, end_date)
+    spread_df = read_postgre_data(sql)
+    
+    inventory_list = []
+    spread_list = []
+    for i in range(0, len(spread_df)):
+        trade_date = spread_df.loc[i]['trade_date']
+        close = spread_df.loc[i]['close']
+        inventory_copy_df = inventory_df[inventory_df.update_date <= trade_date].copy()
+        inventory_copy_df.sort_values(by='update_date', ascending=False, inplace=True)
+        inventory_copy_df.reset_index(drop=True, inplace=True)
+        inventory = inventory_copy_df.loc[0]['value']
+        inventory_list.append(inventory)
+        spread_list.append(close)
+        
+    x = np.array(inventory_list)
+    y = np.array(spread_list)
+    
+    slope, intercept = np.polyfit(x, y, 1)
+    
+    y_up = np.percentile(y, 75)
+    y_down = np.percentile(y, 25)
+    mean_x = x.mean()
+    intercept_up = y_up - mean_x * slope
+    intercept_down = y_down - mean_x * slope
+    
+    plt.figure(figsize=(10, 8))
+    plt.scatter(x, y)
+    plt.plot(x, slope * x + intercept, color='red')
+    plt.plot(x, slope * x + intercept_up, color='blue')
+    plt.plot(x, slope * x + intercept_down, color='blue')
+    plt.plot(inventory_list[len(inventory_list) - 2], spread_list[len(spread_list) - 2], color='orange', marker='*', markersize='20')
+    plt.plot(inventory_list[len(inventory_list) - 1], spread_list[len(spread_list) - 1], color='red', marker='*', markersize='20')
+    plt.rcParams['font.sans-serif']=['SimHei']
+    plt.rcParams['axes.unicode_minus']=False
+    plt.xlabel(index_name)
+    plt.ylabel('价差')
+    plt.title("【{}-{}】【{}{}】库存-价差散点分布及拟合图".format(start_date, end_date, fut_code, spread_type))
+    
+    plt.show()
+        
+    # app = xw.App(visible=True,add_book=False)
+    # wb = app.books.add()
+    # ws = wb.sheets.add()
+    
+    # ws.range('A1').options(transpose=True).value = inventory_list
+    # ws.range('B1').options(transpose=True).value = spread_list
+    # ws.autofit()
+    # wb.save("{}{}库存-价差散点数据.xlsx".format(fut_code, spread_type))
+    # wb.close()
+    # app.quit()
+
 def main():
     # write_fut_diff_to_xlsx('20190101', '20240229', 'IC')
     # write_index_to_xlsx('20190101', '20240229', '中证500')
@@ -316,7 +370,12 @@ def main():
     # write_mean_cb_over_rate_to_xlsx('20190101', '20240228')
     # write_mean_close_to_xlsx('20190101', '20240228')
     # correlation_analysis()
-    analyze_worth_result('C:/Users/yanse/Desktop/综合.xlsx', 'C')
+    # analyze_worth_result('C:/Users/yanse/Desktop/综合.xlsx', 'C')
+    # export_fut_inventory_spread_to_xlsx('V', '09-01', '社会库存合计', '20200101', '20240322')
+    # export_fut_inventory_spread_to_xlsx('HC', '10-01', '库存:热卷(板)', '20200101', '20240322')
+    # export_fut_inventory_spread_to_xlsx('FG', '09-01', '浮法玻璃生产线库存（万吨）', '20200101', '20240322')
+    # export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20200101', '20240322')
+    export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20230101', '20240101')
         
 if __name__ == "__main__":
     main()
