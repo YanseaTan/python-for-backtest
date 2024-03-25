@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2023-10-10
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-12
+# @Last Modified time: 2024-03-22
 
 import time
 import datetime
@@ -337,6 +337,14 @@ def read_csv_test():
         print(chunk)
         chunk.to_sql('md_test', postgre_engine_ts, 'bond', index=False, if_exists='append', chunksize=5000)
 
+def export_opt_basic_data_to_csv():
+    exchange_list = ['SSE', 'SZSE']
+    for exchange in exchange_list:
+        df = pro.opt_basic(exchange=exchange, fields='ts_code,name,per_unit,opt_code,call_put,exercise_price,min_price_chg,list_date,delist_date')
+        df.sort_values(by='ts_code', ascending=True, inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        df.to_csv("./doc/opt-basic/opt_basic_{}.csv".format(exchange), encoding='gbk', index=False)
+
 if __name__ == '__main__':
     # 登录 Tushare 接口
     pro = ts.pro_api(token)
@@ -359,3 +367,5 @@ if __name__ == '__main__':
     #     write_bond_daily_md_to_csv(ts_code)
     
     # read_csv_test()
+    
+    # export_opt_basic_data_to_csv()
