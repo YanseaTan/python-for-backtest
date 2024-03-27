@@ -174,3 +174,5 @@ temp/
 Pipfile
 *.lock
 *.ico
+*.db
+*.zip

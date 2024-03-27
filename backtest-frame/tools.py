@@ -2,7 +2,7 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-25
+# @Last Modified time: 2024-03-26
 
 from turtle import color
 import pandas as pd
@@ -309,7 +309,7 @@ def export_fut_inventory_spread_to_xlsx(fut_code, spread_type, index_name, start
     sql = "select update_date, value from future.fut_funds where index_name = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(index_name, start_date, end_date)
     inventory_df = read_postgre_data(sql)
     start_date = inventory_df.loc[0]['update_date']
-    end_date = inventory_df.loc[len(inventory_df) - 1]['update_date']
+    # end_date = inventory_df.loc[len(inventory_df) - 1]['update_date']
     
     sql = "select trade_date, close from future.fut_spread_daily where fut_code = '{}' and spread_type = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, spread_type, start_date, end_date)
     spread_df = read_postgre_data(sql)
@@ -371,11 +371,12 @@ def main():
     # write_mean_close_to_xlsx('20190101', '20240228')
     # correlation_analysis()
     # analyze_worth_result('C:/Users/yanse/Desktop/综合.xlsx', 'C')
-    # export_fut_inventory_spread_to_xlsx('V', '09-01', '社会库存合计', '20200101', '20240322')
+    export_fut_inventory_spread_to_xlsx('V', '05-09', '社会库存合计', '20200101', '20240325')
+    # export_fut_inventory_spread_to_xlsx('PP', '05-09', '卓创库存-上游PP', '20200101', '20240325')
     # export_fut_inventory_spread_to_xlsx('HC', '10-01', '库存:热卷(板)', '20200101', '20240322')
     # export_fut_inventory_spread_to_xlsx('FG', '09-01', '浮法玻璃生产线库存（万吨）', '20200101', '20240322')
     # export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20200101', '20240322')
-    export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20230101', '20240101')
+    # export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20230101', '20240101')
         
 if __name__ == "__main__":
     main()
