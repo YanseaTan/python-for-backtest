@@ -220,6 +220,15 @@
     ]
   },
   {
+    "fut_code": "J",
+    "index": [
+      {
+        "index_type": "库存",
+        "index_name": "焦炭：库存合计：全样本（周）"
+      }
+    ]
+  },
+  {
     "fut_code": "SM",
     "index": [
       {

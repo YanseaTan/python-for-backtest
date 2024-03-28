@@ -2,14 +2,15 @@
 # @Author: Yansea
 # @Date:   2024-02-26
 # @Last Modified by:   Yansea
-# @Last Modified time: 2024-03-26
+# @Last Modified time: 2024-03-28
 
-from turtle import color
 import pandas as pd
 import xlwings as xw
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import datetime
+import os
 import sys
 sys.path.append('./backtest-frame/api/')
 from api.BackTestApi import *
@@ -305,24 +306,51 @@ def analyze_worth_result(book_name, column):
     app.quit()
 
 # 期货库存与价差散点图绘制
-def export_fut_inventory_spread_to_xlsx(fut_code, spread_type, index_name, start_date, end_date):
+def export_fut_inventory_spread_to_png(fut_code, spread_type, index_name, rec_spread, start_date, end_date, start_month, end_month):
     sql = "select update_date, value from future.fut_funds where index_name = '{}' and update_date >= '{}' and update_date <= '{}' order by update_date".format(index_name, start_date, end_date)
     inventory_df = read_postgre_data(sql)
     start_date = inventory_df.loc[0]['update_date']
-    # end_date = inventory_df.loc[len(inventory_df) - 1]['update_date']
     
     sql = "select trade_date, close from future.fut_spread_daily where fut_code = '{}' and spread_type = '{}' and trade_date >= '{}' and trade_date <= '{}' order by trade_date".format(fut_code, spread_type, start_date, end_date)
     spread_df = read_postgre_data(sql)
     
+    sql = "select avg_value from future.futures_backtesting.fn_inventory_avg_line(5) where fut_code = '{}' and md <= '{}' order by md desc limit 1".format(fut_code, end_date[4:])
+    avg_inventory_df  =read_postgre_data(sql)
+    avg_inventory = avg_inventory_df.loc[0]['avg_value']
+    
+    last_trade_date = datetime.datetime.strptime(end_date, '%Y%m%d').strftime('%Y-%m-%d')
+    sql = "SELECT ticker_n, ticker_f, product, safe_spread from future.safe_spread('{}', '{}') where product = '{}'".format(last_trade_date, last_trade_date, fut_code)
+    safe_spread_df = read_postgre_data(sql)
+    for i in range(0, len(safe_spread_df)):
+        spread_type_new = safe_spread_df.loc[i]['ticker_n'][-2:] + '-' + safe_spread_df.loc[i]['ticker_f'][-2:]
+        if spread_type_new == spread_type:
+            safe_spread = safe_spread_df.loc[i]['safe_spread']
+    
     inventory_list = []
     spread_list = []
+    index = 0
+    check_index = True
+    close_max = -9999
+    close_min = 9999
+    inventory_max = 0
+    inventory_min = 9999999
     for i in range(0, len(spread_df)):
         trade_date = spread_df.loc[i]['trade_date']
+        if (spread_type[:2] > spread_type[-2:] and trade_date[4:6] < start_month or trade_date[4:6] > end_month) or\
+           (spread_type[:2] < spread_type[-2:] and trade_date[4:6] < start_month and trade_date[4:6] > end_month):
+            continue
+        if trade_date[:4] == end_date[:4] and check_index:
+            index = len(inventory_list)
+            check_index = False
         close = spread_df.loc[i]['close']
+        close_max = max(close_max, close)
+        close_min = min(close_min, close)
         inventory_copy_df = inventory_df[inventory_df.update_date <= trade_date].copy()
         inventory_copy_df.sort_values(by='update_date', ascending=False, inplace=True)
         inventory_copy_df.reset_index(drop=True, inplace=True)
         inventory = inventory_copy_df.loc[0]['value']
+        inventory_max = max(inventory_max, inventory)
+        inventory_min = min(inventory_min, inventory)
         inventory_list.append(inventory)
         spread_list.append(close)
         
@@ -338,30 +366,55 @@ def export_fut_inventory_spread_to_xlsx(fut_code, spread_type, index_name, start
     intercept_down = y_down - mean_x * slope
     
     plt.figure(figsize=(10, 8))
-    plt.scatter(x, y)
-    plt.plot(x, slope * x + intercept, color='red')
-    plt.plot(x, slope * x + intercept_up, color='blue')
+    plt.scatter(x[:index], y[:index], color='lightblue', label='往年数据点')
+    plt.scatter(x[index:], y[index:], color='lightcoral', label='今年数据点')
+    plt.plot(x, slope * x + intercept, color='red', label='库存-价差拟合线')
+    plt.plot(x, slope * x + intercept_up, color='blue', label='区域浮动边界')
     plt.plot(x, slope * x + intercept_down, color='blue')
-    plt.plot(inventory_list[len(inventory_list) - 2], spread_list[len(spread_list) - 2], color='orange', marker='*', markersize='20')
-    plt.plot(inventory_list[len(inventory_list) - 1], spread_list[len(spread_list) - 1], color='red', marker='*', markersize='20')
+    plt.axhline(y=rec_spread, label='安全价差', color='orange')
+    plt.axhline(y = -safe_spread, label='无风险价差', color='fuchsia')
+    plt.axvline(x = avg_inventory, label='历史库存均线', color='green')
+    plt.plot(inventory_list[len(inventory_list) - 2], spread_list[len(spread_list) - 2], color='orange', marker='*', markersize='20', label='上一交易日')
+    plt.plot(inventory_list[len(inventory_list) - 1], spread_list[len(spread_list) - 1], color='red', marker='*', markersize='20', label='最新交易日')
     plt.rcParams['font.sans-serif']=['SimHei']
     plt.rcParams['axes.unicode_minus']=False
     plt.xlabel(index_name)
     plt.ylabel('价差')
-    plt.title("【{}-{}】【{}{}】库存-价差散点分布及拟合图".format(start_date, end_date, fut_code, spread_type))
+    plt.title("【{}-{}】【{}{}（{}月至{}月）】库存-价差散点分布及拟合图".format(start_date, end_date, fut_code, spread_type, int(start_month), int(end_month)))
     
-    plt.show()
-        
-    # app = xw.App(visible=True,add_book=False)
-    # wb = app.books.add()
-    # ws = wb.sheets.add()
+    today = datetime.date.today()
+    todayStr = today.strftime('%Y%m%d')
+    if not os.path.exists('output/{}/库存-价差散点图/'.format(todayStr)):
+        os.makedirs('output/{}/库存-价差散点图/'.format(todayStr))
+    plt.legend()
+    plt.savefig('./output/{}/库存-价差散点图/【{}-{}】【{}{}（{}月至{}月）】库存-价差散点分布及拟合图.png'.format(todayStr, start_date, end_date, fut_code, spread_type, int(start_month), int(end_month)), dpi=300)
+    print("【{}-{}】【{}{}（{}月至{}月）】库存-价差散点分布及拟合图输出完毕！".format(start_date, end_date, fut_code, spread_type, int(start_month), int(end_month)))
     
-    # ws.range('A1').options(transpose=True).value = inventory_list
-    # ws.range('B1').options(transpose=True).value = spread_list
-    # ws.autofit()
-    # wb.save("{}{}库存-价差散点数据.xlsx".format(fut_code, spread_type))
-    # wb.close()
-    # app.quit()
+    # plt.show()
+
+def update_fut_inventory_spread_png():
+    start_date = '20200101'
+    option_list = [['HC', '10-01', '库存:热卷(板)', 40], ['V', '05-09', '社会库存合计', -100], ['FG', '09-01', '浮法玻璃生产线库存（万吨）', 30], ['NI', '05-06', '电解镍国内社会库存（吨）', -300],
+                   ['M', '05-07', '豆粕库存_中国', 0], ['RM', '05-07', '菜粕库存_中国', 0], ['J', '05-09', '焦炭：库存合计：全样本（周）', 0], ['J', '09-01', '焦炭：库存合计：全样本（周）', 0]]
+    option_list = [['SN', '05-06', '中国分地区锡锭社会库存-总库存', -500]]
+    option_list = [['SP', '09-01', '港口纸浆总库存', -110]]
+    option_list = [['SP', '05-09', '港口纸浆总库存', -110]]
+    option_list = [['SP', '07-09', '港口纸浆总库存', -50]]
+    option_list = [['RU', '05-09', '港口纸浆总库存', -50]]
+    option_list = [['BU', '06-09', '沥青-华东炼厂库存量（万吨）', -50]]
+    today = datetime.date.today()
+    oneday = datetime.timedelta(days=1)
+    todayStr = (today - oneday).strftime('%Y%m%d')
+    date_list = get_cal_date_list(start_date, todayStr)
+    end_date = date_list[len(date_list) - 1]
+    for opt in option_list:
+        start_month = str(int(opt[1][-2:]) + 2)
+        if len(start_month) == 1:
+            start_month = '0' + start_month
+        end_month = str(int(opt[1][:2]) - 1)
+        if len(end_month) == 1:
+            end_month = '0' + end_month
+        export_fut_inventory_spread_to_png(opt[0], opt[1], opt[2], opt[3], start_date, end_date, start_month, end_month)
 
 def main():
     # write_fut_diff_to_xlsx('20190101', '20240229', 'IC')
@@ -371,12 +424,9 @@ def main():
     # write_mean_close_to_xlsx('20190101', '20240228')
     # correlation_analysis()
     # analyze_worth_result('C:/Users/yanse/Desktop/综合.xlsx', 'C')
-    export_fut_inventory_spread_to_xlsx('V', '05-09', '社会库存合计', '20200101', '20240325')
-    # export_fut_inventory_spread_to_xlsx('PP', '05-09', '卓创库存-上游PP', '20200101', '20240325')
-    # export_fut_inventory_spread_to_xlsx('HC', '10-01', '库存:热卷(板)', '20200101', '20240322')
-    # export_fut_inventory_spread_to_xlsx('FG', '09-01', '浮法玻璃生产线库存（万吨）', '20200101', '20240322')
-    # export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20200101', '20240322')
-    # export_fut_inventory_spread_to_xlsx('RB', '10-01', 'Mysteel螺纹社会库存', '20230101', '20240101')
+
+    # export_fut_inventory_spread_to_png('HC', '10-01', '库存:热卷(板)', 40, '20200101', '20240326', '03', '09')
+    update_fut_inventory_spread_png()
         
 if __name__ == "__main__":
     main()

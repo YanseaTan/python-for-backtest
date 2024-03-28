@@ -1,0 +1,56 @@
+{
+  "db": {
+    "tick": {
+      "futures": {
+        "ctp": {}
+      }
+    }
+  },
+  "csv": {
+    "tick": {
+      "stock": {
+        "huabao": {
+          "TradingDay": 0,
+          "UpdateTime": 1,
+          "UpdateMillisec": 2,
+          "LocalTime": 3,
+          "InstrumentID": 4,
+          "ExchangeID": 5,
+          "LastPrice": 7,
+          "OpenPrice": 11,
+          "HighestPrice": 12,
+          "LowestPrice": 13,
+          "Volume": 14,
+          "Turnover": 15,
+          "OpenInterest": 16,
+          "ClosePrice": 17,
+          "SettlementPrice": 18,
+          "UpperLimitPrice": 19,
+          "LowerLimitPrice": 20,
+          "BidPrice1": 23,
+          "BidVolume1": 24,
+          "AskPrice1": 25,
+          "AskVolume1": 26,
+          "BidPrice2": 27,
+          "BidVolume2": 28,
+          "AskPrice2": 29,
+          "AskVolume2": 30,
+          "BidPrice3": 31,
+          "BidVolume3": 32,
+          "AskPrice3": 33,
+          "AskVolume3": 34,
+          "BidPrice4": 35,
+          "BidVolume4": 36,
+          "AskPrice4": 37,
+          "AskVolume4": 38,
+          "BidPrice5": 39,
+          "BidVolume5": 40,
+          "AskPrice5": 41,
+          "AskVolume5": 42,
+          "AveragePrice": 43,
+          "ActionDay": 44
+        }
+      }
+    }
+  }
+}
